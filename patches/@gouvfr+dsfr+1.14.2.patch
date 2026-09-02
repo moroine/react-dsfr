@@ -8,10 +8,32 @@ index e4d335c..6c53dce 100644
  </svg>
 +<!-- Slightly increasing size so it reaches the threshold that will prevent it from being inlined by Vite. -->
 diff --git a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-index fcde523..7996e40 100644
+index 0640386..7d7ec26 100644
 --- a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 +++ b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-@@ -6461,9 +6461,11 @@ class HeaderLinks extends api.core.Instance {
+@@ -202,6 +202,12 @@ const Modes = {
+   REACT: 'react'
+ };
+ 
++// Seuls attributs data-fr-js-* dont le CSS DSFR dépend :
++// .fr-range[data-fr-js-range] et .fr-table[data-fr-js-table=true].
++// En mode react, les autres ne sont pas posés : ils divergeraient du HTML rendu
++// par le serveur sans qu'aucun style n'en dépende.
++const CSS_BOUND_JS_ATTRIBUTES = ['data-fr-js-range', 'data-fr-js-table'];
++
+ const dispatch = (node, type, detail = null, bubbles = true, cancelable = false) => {
+   const options = { bubbles: bubbles === true, cancelable: cancelable === true };
+   if (detail) options.detail = detail;
+@@ -1589,7 +1595,7 @@ class Instance {
+     this.registration = registration;
+     this.node = element.node;
+     this.id = element.node.id;
+-    if (this.jsAttribute) this.setAttribute(registration.attribute, true);
++    if (this.jsAttribute && (options.mode !== Modes.REACT || CSS_BOUND_JS_ATTRIBUTES.indexOf(registration.attribute) > -1)) this.setAttribute(registration.attribute, true);
+     this.init();
+   }
+ 
+@@ -6461,9 +6467,11 @@ class HeaderLinks extends api.core.Instance {
        case api.Modes.ANGULAR:
        case api.Modes.REACT:
        case api.Modes.VUE:
