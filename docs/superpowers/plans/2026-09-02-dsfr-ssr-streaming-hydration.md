@@ -21,6 +21,7 @@
 - **Identifiants à utiliser dans le patch : `options.mode` et `Modes.REACT`.** Dans le bundle `dsfr.module.js`, `const options` est déclaré l.329 et `const Modes` l.195, donc tous deux disponibles dans `Stage` (l.768) et `Instance` (l.1559). `const api` n'est déclaré qu'à la l.3279 : ne pas s'en servir dans ces deux zones.
 - **Style de code** : 4 espaces, guillemets doubles, clés d'objet entre guillemets dans `src/`. Lancer `npx --yes yarn@1.22.22 format` et `npx --yes yarn@1.22.22 lint:check` avant chaque commit touchant `src/`.
 - **`yarn build` doit précéder `yarn test`.** `src/fr/generatedFromCss/` est produit par le build (`cssToTs`) ; sans lui, `test/runtime/lib/spacing.test.ts` et `test/runtime/lib/gdpr.test.ts` échouent au chargement. Référence vérifiée après build sur cette branche : **27 fichiers, 108 tests, tous verts**. Toute exécution de test qui montre 25/27 fichiers signifie simplement que le build n'a pas été lancé.
+- **`npx --yes yarn@1.22.22 format` reformate aussi les `.md`**, donc les fichiers de `docs/` — et corrompt au passage certaines lignes contenant des `**` dans du code inline. Ces fichiers sont des artefacts de travail du coordinateur : après un `format`, restaure-les par `git checkout -- docs` et ne les commite jamais.
 - **Branche** : rester sur `agent/hydratation`. Ne jamais changer de branche.
 - **`/docs/` est gitignoré** dans ce dépôt. La spec et ce plan sont versionnés via `git add -f` et constituent des artefacts de travail : ils devront être retirés de la branche avant l'ouverture de la PR (Task 7).
 
