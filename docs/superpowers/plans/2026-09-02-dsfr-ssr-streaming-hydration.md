@@ -90,7 +90,7 @@ Fichier `test/integration/next-app-router-streaming/package.json` :
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "next dev -p 3100",
+        "dev": "node --stack-size=8000 node_modules/.bin/next dev -p 3100",
         "build": "node --stack-size=8000 node_modules/.bin/next build",
         "start": "next start -p 3100"
     },
@@ -1167,18 +1167,26 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
     testDir: ".",
-    timeout: 60_000,
+    // Le serveur de dev compile à la première requête, en plus du délai de
+    // streaming de 1,5 s.
+    timeout: 120_000,
     use: {
         baseURL: "http://localhost:3100",
         // Chrome système : évite le téléchargement d'un navigateur.
         channel: "chrome"
     },
     webServer: {
-        command: "npx --yes yarn@1.22.22 start",
+        // Serveur de DÉVELOPPEMENT, délibérément. La mesure de la Task 1 a
+        // établi qu'en production les trois routes sont strictement
+        // silencieuses, avec ou sans le correctif : React ne remonte le diff
+        // d'hydratation qu'en développement. Un e2e visant `next start` ne
+        // pourrait donc ni observer le défaut ni démontrer sa correction —
+        // il passerait à vide dans les deux sens.
+        command: "npx --yes yarn@1.22.22 dev",
         cwd: "../integration/next-app-router-streaming",
         url: "http://localhost:3100/no-streaming",
         reuseExistingServer: true,
-        timeout: 120_000
+        timeout: 180_000
     }
 });
 ```
@@ -1190,9 +1198,15 @@ Fichier `test/e2e/streaming.spec.ts` :
 ```ts
 import { test, expect, type ConsoleMessage } from "@playwright/test";
 
+// React 19 a reformulé le message : il dit « didn't match », pas
+// « did not match ». Un motif qui ne couvrirait que l'ancienne formulation
+// laisserait passer le seul message que cette app produit réellement, et le
+// test passerait à vide. Mesuré en Task 1.
 const HYDRATION_PATTERNS = [
-    "Extra attributes from the server",
+    "A tree hydrated but some attributes",
+    "didn't match",
     "did not match",
+    "Extra attributes from the server",
     "Hydration failed",
     "There was an error while hydrating"
 ];
@@ -1308,7 +1322,7 @@ Le serveur Next est démarré automatiquement par Playwright sur le port 3100.
 
 - [ ] **Step 4 : Lancer le test sur la branche corrigée**
 
-Le `--force` de la deuxième ligne n'est pas décoratif : `file:` copie `dist/`, donc sans réinstallation l'app testerait la version de la bibliothèque d'avant les Tasks 2 à 5.
+L'e2e tourne contre `next dev` (voir la config), donc pas de `next build` requis pour lui. Le `--force` de la deuxième ligne n'est pas décoratif : `file:` copie `dist/`, donc sans réinstallation l'app testerait la version de la bibliothèque d'avant les Tasks 2 à 5.
 
 ```bash
 cd /workspace/.trees/hydratation
@@ -1327,6 +1341,8 @@ grep -c "CSS_BOUND_JS_ATTRIBUTES" test/integration/next-app-router-streaming/nod
 ```
 
 Attendu : une valeur ≥ 2, puis les trois tests PASSENT.
+
+**Si un message d'hydratation subsiste malgré le correctif, n'affaiblis pas l'assertion.** Rapporte son contenu intégral. La mesure de la Task 1 a relevé, dans le diff React de développement, des lignes portant aussi sur du texte et sur `className`/`aria-selected` (onglets), en plus des `data-fr-js-*`. Il est probable que ce soient de simples lignes de contexte imprimées par React autour des vraies divergences, mais ce n'est pas établi. Si le message ne disparaît pas entièrement, c'est une information de premier ordre sur les limites du correctif — pas un test à assouplir.
 
 - [ ] **Step 5 : Vérifier que le test échoue sans le correctif**
 
@@ -1410,7 +1426,9 @@ Attendu : les quatre commandes réussissent. Ne pas passer à l'étape suivante 
 2. Le problème, en trois phrases : `StartDsfrOnHydration` diffère le démarrage du moteur, ce qui ne corrige pas le streaming mais le contourne ; le contenu arrivé par un boundary est muté avant hydratation ; la seule façon d'être à l'abri était de ne plus streamer.
 3. Le tableau d'audit des 46 registrations, copié depuis la section « Audit » de la spec. C'est l'argument central : il démontre que le changement est borné.
 4. Les deux modifications du moteur, avec leur diff.
-5. Le relevé de `MEASUREMENTS.md`.
+5. Le relevé de `MEASUREMENTS.md`, **présenté sans l'enjoliver**. Ce que la mesure a établi : en développement, le streaming produit un vrai message de divergence d'hydratation React 19 listant les `data-fr-js-*` sur sept composants, tandis que la même page sans `<Suspense>` reste silencieuse — la divergence est donc bien imputable au streaming. En production, en revanche, les trois routes sont strictement silencieuses et aucun boundary n'est re-rendu.
+
+   La PR doit donc être argumentée pour ce qu'elle est : **elle supprime un défaut réel et reproductible en développement, pas une casse observable en production.** C'est le cas de figure que la §4.2 de la spec avait anticipé. Sa valeur reste entière et tient en deux points : un avertissement d'hydratation permanent en développement est indiscernable d'un vrai problème et finit par être ignoré, ce qui masque les suivants ; et `<StartDsfrOnHydration />` cesse d'être obligatoire sur chaque page. Ne pas prétendre corriger une casse de production que la mesure n'a pas constatée.
 6. Les limites, copiées depuis « Risques et limites » de la spec — en particulier le fait que rAF est une heuristique d'ordonnancement et que les écouteurs sont attachés une frame plus tard.
 7. La mention que ce comportement a vocation à remonter dans `GouvernementFR/dsfr`, le patch n'étant qu'un véhicule.
 
