@@ -190,3 +190,86 @@ est un avertissement de dev (React ne le remonte qu'en mode développement)
 et non une casse réelle observable par un utilisateur final. Le patch peut
 donc procéder tel que conçu, sans réduction ni extension de périmètre motivée
 par ce relevé.
+
+## Vérification e2e : échec sans patch, succès avec
+
+Titre de section conservé tel que spécifié par la Task 6, mais **le résultat
+ne suit pas ce schéma** : voir le constat ci-dessous, rapporté intégralement
+sans atténuation de l'assertion qui l'a révélé (Step 5 de la Task 6, exécuté
+le 2026-09-02).
+
+Les trois tests de `test/e2e/streaming.spec.ts` ont été exécutés deux fois
+contre `next dev`, Chrome système (`channel: "chrome"`) :
+
+1. **Avec le patch** `@gouvfr/dsfr` (état normal du dépôt, `dist/` reconstruit,
+   copie de l'app d'intégration réinstallée avec `--force`, vérifié par
+   `grep -c CSS_BOUND_JS_ATTRIBUTES … = 2`) : **2 tests échouent, 1 passe.**
+2. **Sans le patch** (moteur `@gouvfr/dsfr` vierge — `patches/` déplacé hors
+   du répertoire de travail avant un `yarn install --frozen-lockfile --force`
+   qui a forcé un réinstall propre de `node_modules/@gouvfr/dsfr`, vérifié par
+   `grep -c "^        /\*$" … = 0` et par `grep -c CSS_BOUND_JS_ATTRIBUTES … = 0`,
+   puis `dist/` et la copie de l'app reconstruits à l'identique) :
+   **2 tests échouent, 1 passe — résultat strictement identique, caractère
+   pour caractère, au précédent.**
+
+| Test | Avec patch | Sans patch |
+|---|---|---|
+| `streaming : aucune divergence d'hydratation, moteur fonctionnel` | ÉCHEC | ÉCHEC (diff identique) |
+| `StartDsfrOnHydration monté : toujours fonctionnel` | ÉCHEC | ÉCHEC (diff identique) |
+| `sans streaming : aucune divergence d'hydratation` | PASSE | PASSE |
+
+Dans les deux configurations, `page.on("pageerror")` capture le même message,
+au caractère près, sur `/streaming` et `/streaming-legacy` (jamais sur
+`/no-streaming`) :
+
+> Hydration failed because the server rendered HTML didn't match the client.
+> As a result this tree will be regenerated on the client. […]
+
+C'est un message **différent** de celui mesuré en Task 1 (« A tree hydrated
+but some attributes… didn't match », remonté via `console.error`, sans
+remontage d'arbre). Celui-ci est remonté via l'événement `pageerror` (une
+exception, pas un simple avertissement), et il annonce explicitement que
+React regénère tout le sous-arbre côté client.
+
+Le diff imprimé par React dans ce message ne contient **aucune mention** des
+attributs `data-fr-js-*` (le motif qui était visible dans le relevé de la
+Task 1 et que le patch `CSS_BOUND_JS_ATTRIBUTES` cible spécifiquement). Les
+seules paires `-`/`+` réellement appariées (une valeur serveur explicitement
+opposée à une valeur client, à l'inverse des lignes portant un seul signe qui
+ne sont que le rendu du sous-arbre régénéré) portent sur :
+
+- `aria-selected` du premier onglet : `"false"` (serveur) → `true` (client) ;
+- `className` du panneau associé : `"fr-tabs__panel"` → `"fr-tabs__panel fr-tabs__panel--selected"`.
+
+Les autres lignes marquées (`className=""` du `<table>`, `style` avec
+`--tabs-list-height`, `--equisized-width`, la sortie du curseur `Range`) n'ont
+qu'un seul signe, sans valeur opposée explicite : elles décrivent l'état du
+sous-arbre régénéré côté client (où la classe/le style disparaissent, car
+DSFR ne les a pas encore recalculés au moment de ce nouveau rendu), pas des
+paires serveur/client contradictoires au même titre que `aria-selected`.
+
+**Lecture.** Le patch Task 2 (attributs `data-fr-js-*` limités + parsing des
+nœuds ajoutés différé d'une frame) est bien inopérant sur ce défaut résiduel
+précisément parce que ce défaut n'a jamais porté sur les attributs
+`data-fr-js-*` : le moteur DSFR, en initialisant `Tabs` sur du contenu arrivé
+par streaming, sélectionne le premier onglet (`aria-selected`, classe
+`--selected`) — une mutation que rien dans les Tasks 2 à 5 ne différait pour
+ce cas précis. `/no-streaming` reste indemne dans les deux configurations
+testées, ce qui est cohérent avec la conception de `DsfrProvider` (Task 5) :
+les effets des enfants s'exécutant avant celui du parent, `window.dsfr.start()`
+n'est déclenché qu'après que **tout** l'arbre initial a fini de s'hydrater —
+mais sur `/streaming` et `/streaming-legacy`, cet arbre initial ne contient
+que le shell et le fallback (le vrai contenu arrive dans un commit ultérieur,
+après coup), donc `isAfterFirstEffect` passe à `true` trop tôt par rapport à
+l'hydratation du contenu réellement streamé.
+
+**Conséquence pour cette tâche.** Le critère du Step 5 (« le premier test
+échoue sans le patch, puis passe avec ») **n'est pas rempli** : le premier et
+le deuxième test échouent identiquement dans les deux configurations. Ce test
+e2e prouve donc uniquement ce que confirme la troisième assertion : la route
+sans streaming est saine, avec ou sans le patch `@gouvfr/dsfr`. Il ne
+démontre pas que les Tasks 2 à 5 rendent les routes de streaming silencieuses
+en développement — elles ne le sont pas, pour une raison distincte de celle
+que ces tâches ciblaient. Conformément à la consigne de la Task 6, cette
+assertion n'a pas été affaiblie pour faire passer le test : le message est
+rapporté ici intégralement plutôt que masqué.
