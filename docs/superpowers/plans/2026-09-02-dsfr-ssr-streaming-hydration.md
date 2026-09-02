@@ -14,6 +14,7 @@
 
 - **`yarn` n'est pas installé dans cet environnement.** Toute commande `yarn` du dépôt doit être invoquée `npx --yes yarn@1.22.22 <commande>`. Exemple : `npx --yes yarn@1.22.22 build`.
 - **Les suppressions récursives du shell sont bloquées par un hook** dans cet environnement. Pour supprimer un répertoire, passer par Node : `node -e "require('fs').rmSync('<chemin>',{recursive:true,force:true})"`.
+- **`patch-package` invoque `yarn` directement**, pas via `npx`, pour son installation interne. Comme `yarn` est absent du PATH, il faut lui fournir un shim exécutable nommé `yarn` (qui relaie vers `npx --yes yarn@1.22.22 "$@"`) dans un répertoire ajouté au PATH le temps de la commande. Ce shim se place **hors du dépôt** et n'est jamais commité.
 - **Le cache npm par défaut est partiellement inaccessible.** Si une commande `npm` échoue en `EACCES` sur `/home/aiuser/.npm/_cacache`, relancer avec `--cache /tmp/npmcache`.
 - **Ne jamais éditer `node_modules/@gouvfr/dsfr/**` sans régénérer le patch.** Le cycle est : éditer le fichier dans `node_modules`, puis `npx --yes patch-package @gouvfr/dsfr`, qui réécrit `patches/@gouvfr+dsfr+1.14.2.patch`. Le patch existant contient déjà deux hunks (artwork SVG, warning `HeaderLinks`) qui doivent être préservés.
 - **Version DSFR figée : `1.14.2`** (`package.json`, `devDependencies` et `peerDependencies`). Le nom du fichier de patch en dépend.
