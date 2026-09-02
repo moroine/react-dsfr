@@ -54,30 +54,41 @@ de l'app. Aucune erreur « à nous » à corriger dans cette tâche.
 ```
 $ find test/integration/next-app-router-streaming/node_modules -type d -name react -path "*@types*"
 node_modules/@types/react
-node_modules/@types/react-dom/node_modules/@types/react
 ```
 
-Deux copies sont bien présentes, y compris sur une installation strictement
-propre (`node_modules` et `yarn.lock` supprimés puis `yarn install` relancé
-depuis zéro) : `node_modules/@types/react@19.0.0` (la version épinglée par
-notre `package.json`) et `node_modules/@types/react-dom/node_modules/@types/react@19.2.18`
-(une copie imbriquée plus récente, tirée par la dépendance lâche
-`"@types/react": "*"` de `@types/react-dom`). C'est un artefact
-d'installation de cette app, pas quelque chose d'imputable à `react-dsfr`.
+Réinstallé strictement depuis le `yarn.lock` commité (`node_modules`
+supprimé, `yarn install --frozen-lockfile`) : **une seule** copie de
+`@types/react`, en `19.0.0`. Le lockfile fusionne bien
+`"@types/react@*", "@types/react@19.0.0":` en une entrée unique — c'est
+l'état reproductible depuis le livrable, et c'est celui qu'il faut retenir.
 
-Vérification supplémentaire (au-delà de la seule commande demandée) : j'ai
-forcé une résolution unique via un champ `resolutions` temporaire
-(`{ "@types/react": "19.0.0", "@types/react-dom": "19.0.0" }`), réinstallé,
-confirmé qu'il ne restait plus qu'une seule copie de `@types/react` dans
-l'arbre, puis relancé `tsc --noEmit` : **les deux mêmes erreurs
-réapparaissent à l'identique**, caractère pour caractère. La copie multiple
-existe donc bel et bien, mais elle n'est pas la cause de l'incompatibilité :
-même avec une seule copie de `@types/react@19.0.0`, `DsfrProviderBase` et
-`DsfrHeadBase` ne sont pas assignables comme composants JSX. L'incompatibilité
-est donc réelle et imputable aux `.d.ts` publiés dans `dist/` (compilés
-contre React 18), pas à un artefact d'installation local. Le champ
-`resolutions` de test a été retiré après vérification ; il ne fait pas partie
-de la configuration livrée.
+Pendant le diagnostic initial, une séquence d'expérimentation différente
+(suppression du `yarn.lock` lui-même puis résolution entièrement fraîche,
+avant l'ajout puis le retrait d'un champ `resolutions` de test) avait fait
+apparaître une seconde copie imbriquée sous `@types/react-dom` en `19.2.18`.
+Ce doublon ne se reproduit pas depuis l'état commité ci-dessus : c'était un
+artefact ponctuel de cette séquence d'expérimentation précise, pas un fait
+stable de l'installation livrée, et il ne faut pas s'y fier.
+
+Ce qui reste, et qui établit la conclusion, c'est la vérification faite
+pendant cette même expérimentation : avec une résolution forcée à une seule
+copie de `@types/react@19.0.0` (via un `resolutions` de test, retiré depuis),
+`tsc --noEmit` donnait déjà les deux mêmes erreurs, caractère pour caractère,
+que celles obtenues ci-dessous depuis l'installation normale. Rejoué
+maintenant depuis le `yarn.lock` commité — qui ne contient lui-même qu'une
+seule copie, sans artifice — le résultat est identique :
+
+```
+app/dsfr-bootstrap/index.tsx(18,10): error TS2786: 'DsfrProviderBase' cannot be used as a JSX component.
+app/dsfr-bootstrap/server-only.tsx(12,13): error TS2786: 'DsfrHeadBase' cannot be used as a JSX component.
+```
+
+Une seule copie de `@types/react@19.0.0`, dans les deux cas (résolution
+forcée pendant le diagnostic, et installation normale depuis le lockfile
+commité), donne les deux mêmes erreurs. L'incompatibilité est donc réelle et
+imputable aux `.d.ts` publiés dans `dist/` (compilés contre React 18), pas à
+une copie multiple de `@types/react` — il n'y en a d'ailleurs pas dans
+l'installation livrée.
 
 ## `/streaming` — développement
 
