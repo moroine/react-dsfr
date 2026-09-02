@@ -95,7 +95,7 @@ Fichier `test/integration/next-app-router-streaming/package.json` :
         "start": "next start -p 3100"
     },
     "dependencies": {
-        "@codegouvfr/react-dsfr": "link:../../../dist",
+        "@codegouvfr/react-dsfr": "file:../../../dist",
         "next": "15.1.6",
         "react": "19.0.0",
         "react-dom": "19.0.0"
@@ -110,7 +110,13 @@ Fichier `test/integration/next-app-router-streaming/package.json` :
 }
 ```
 
-Le protocole `link:` crée un lien symbolique vers `dist/`, ce qui évite d'avoir à réinstaller après chaque `yarn build`. `sass` est requis parce que `DsfrHead` importe `assets/dsfr_plus_icons.scss`.
+Le protocole `file:` copie `dist/` au lieu d'y faire un lien symbolique. C'est ce qu'emploient déjà `test/integration/next-appdir` et `next-pagesdir` dans ce dépôt, avec le même `next.config.js` minimal.
+
+`link:` a été essayé et **ne fonctionne pas** : webpack ne résout pas les imports d'assets du paquet (`favicon/*.png|svg|ico`, `assets/dsfr_plus_icons.scss`, `dsfr/fonts/Marianne-*.woff2`) à travers un symlink pointant hors de l'arbre du projet, alors que Node les résout parfaitement. Toutes les routes retournent alors HTTP 500 et `next build` échoue. Trois contournements côté `next.config.js` ont été testés sans succès : `experimental.externalDir`, `snapshot.managedPaths: []` (sans effet), et `resolve.symlinks: false` (corrige les binaires mais provoque un `RangeError: Maximum call stack size exceeded` dans la chaîne `resolve-url-loader` → `sass-loader`).
+
+**Conséquence à ne pas oublier** : `file:` copie. Après toute reconstruction de `dist/` — c'est-à-dire après les Tasks 2 à 5, qui modifient le moteur et `src/` — il faut relancer `npx --yes yarn@1.22.22 install --force` dans l'app de repro avant de re-mesurer, sans quoi on mesurerait une copie périmée de la bibliothèque.
+
+`sass` est requis parce que `DsfrHead` importe `assets/dsfr_plus_icons.scss`.
 
 - [ ] **Step 3 : Créer `next.config.js` et `tsconfig.json`**
 
@@ -1291,14 +1297,25 @@ Le serveur Next est démarré automatiquement par Playwright sur le port 3100.
 
 - [ ] **Step 4 : Lancer le test sur la branche corrigée**
 
+Le `--force` de la deuxième ligne n'est pas décoratif : `file:` copie `dist/`, donc sans réinstallation l'app testerait la version de la bibliothèque d'avant les Tasks 2 à 5.
+
 ```bash
 cd /workspace/.trees/hydratation
 npx --yes yarn@1.22.22 build
-cd test/integration/next-app-router-streaming && npx --yes yarn@1.22.22 build && cd ../../..
+cd test/integration/next-app-router-streaming
+npx --yes yarn@1.22.22 install --force
+npx --yes yarn@1.22.22 build
+cd ../../..
 cd test/e2e && npx --yes yarn@1.22.22 install && npx playwright test
 ```
 
-Attendu : les trois tests PASSENT.
+Vérifier que la copie est bien à jour avant de lancer les tests — le patch doit être présent dans la copie, pas seulement à la racine :
+
+```bash
+grep -c "CSS_BOUND_JS_ATTRIBUTES" test/integration/next-app-router-streaming/node_modules/@codegouvfr/react-dsfr/dsfr/dsfr.module.js
+```
+
+Attendu : une valeur ≥ 2, puis les trois tests PASSENT.
 
 - [ ] **Step 5 : Vérifier que le test échoue sans le correctif**
 
@@ -1314,6 +1331,7 @@ node -e "require('fs').rmSync('node_modules/@gouvfr/dsfr',{recursive:true,force:
 npx --yes yarn@1.22.22 install --frozen-lockfile
 grep -c "^        /\*$" node_modules/@gouvfr/dsfr/dist/dsfr.module.js   # doit valoir 0 : moteur vierge
 npx --yes yarn@1.22.22 build
+cd test/integration/next-app-router-streaming && npx --yes yarn@1.22.22 install --force && npx --yes yarn@1.22.22 build && cd ../../..
 cd test/integration/next-app-router-streaming && npx --yes yarn@1.22.22 build && cd ../../..
 cd test/e2e && npx playwright test
 ```
