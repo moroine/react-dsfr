@@ -69,6 +69,11 @@ export const Table = memo(
                 id={id}
                 ref={ref}
                 style={style}
+                // Le moteur DSFR pose data-fr-js-table="true" sur ce nœud après
+                // hydratation ; le CSS en dépend, donc l'attribut ne peut pas être
+                // supprimé côté moteur. Il porte sur ce nœud précis, ce qui rend la
+                // portée d'un seul niveau de suppressHydrationWarning suffisante.
+                suppressHydrationWarning
                 className={cx(
                     fr.cx(
                         "fr-table",

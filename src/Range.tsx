@@ -149,6 +149,9 @@ export const Range = memo(
                         ),
                         classes.rangeWrapper
                     )}
+                    // Le moteur DSFR pose data-fr-js-range sur ce nœud après
+                    // hydratation ; le CSS en dépend (.fr-range[data-fr-js-range]).
+                    suppressHydrationWarning
                     data-fr-prefix={prefix}
                     data-fr-suffix={suffix}
                 >
