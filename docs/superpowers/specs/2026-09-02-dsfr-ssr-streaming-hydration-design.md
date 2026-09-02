@@ -89,12 +89,12 @@ besoin de savoir quand l'hydratation est terminée.
 
 ## §2 — Patch `@gouvfr/dsfr`
 
-Trois modifications dans `patches/@gouvfr+dsfr+1.14.2.patch`, qui existe déjà. Le patch est bien
+Deux modifications dans `patches/@gouvfr+dsfr+1.14.2.patch`, qui existe déjà. Le patch est bien
 embarqué dans le paquet publié : `scripts/build/build.ts:33` copie
 `node_modules/@gouvfr/dsfr/dist` vers `dsfr/`, et `dsfr/` figure dans `files` du `package.json`.
 
-Les trois modifications sont **indépendantes et justifiables séparément**, de sorte qu'une PR amont
-qui n'en retiendrait que deux reste cohérente.
+Les deux modifications sont **indépendantes et justifiables séparément**, de sorte qu'une PR amont
+qui n'en retiendrait qu'une reste cohérente.
 
 ### §2.1 — Ne plus poser les `data-fr-js-*` inutiles
 
@@ -124,25 +124,69 @@ couvert par le `suppressHydrationWarning` de `getHtmlAttributes`.
 **Vérification d'implémentation** : s'assurer qu'aucun code interne du moteur ne relit
 `registration.attribute` depuis le DOM (voir `Element.examine`, `Instance.mutate`).
 
-### §2.2 — Différer `init()` d'une frame en mode React
+### §2.2 — Différer le parsing des nœuds ajoutés d'une frame en mode React
 
-Dans `Instance._config` (l.1593) :
+Dans `Stage.mutate` (l.833) :
 
 ```diff
--    this.init();
-+    if (api.mode === api.Modes.REACT) window.requestAnimationFrame(() => { if (!this.isDisposed) this.init(); });
-+    else this.init();
+       case 'childList':
+         mutation.removedNodes.forEach((node) => this.dispose(node));
+-        mutation.addedNodes.forEach((node) => this.parse(node));
++        mutation.addedNodes.forEach((node) => {
++          if (api.mode === api.Modes.REACT) {
++            if (this.modifications.indexOf(node) === -1) this.modifications.push(node);
++          } else this.parse(node);
++        });
+         break;
 ```
 
-Cette modification traite les mutations #2 et #3 d'un seul geste, sans toucher aux six classes
-concernées. `init()` est ce qui met `isRendering` / `isResizing` à `true`, donc ce qui enrôle
-l'instance dans le `Renderer` et le `Resizer` — les seuls producteurs des `style.setProperty()` et
-du `classList` du `Segmented`. Décaler `init()` décale toute la chaîne.
+Cette modification n'introduit aucune machinerie : elle route les nœuds ajoutés vers un chemin
+différé **que `Stage` possède déjà**. Les mutations d'attributs ne sont en effet pas traitées
+immédiatement — elles sont empilées dans `this.modifications`, et le bloc en fin de `mutate`
+(l.851-855) déclenche `modify()` au `requestAnimationFrame` suivant, lequel appelle `this.parse(target)`.
+Seul le `childList` parsait en synchrone. Le patch supprime cette asymétrie en mode React.
 
-**Contrepartie assumée** : les écouteurs d'événements sont attachés une frame plus tard (~16 ms
-après l'insertion du nœud). Un clic survenant dans cette fenêtre serait perdu. C'est le point le
-plus discutable du design ; il est documenté comme tel dans la PR et couvert par l'assertion
-fonctionnelle de l'e2e (§4.4).
+Elle traite les mutations #2 et #3 sans toucher aux six classes concernées : décaler `parse()` décale
+`populate()`, donc `_config()`, donc `init()` — qui est ce qui met `isRendering` / `isResizing` à
+`true` et enrôle l'instance dans le `Renderer` et le `Resizer`, seuls producteurs des
+`style.setProperty()` et du `classList` du `Segmented`.
+
+Elle diffère par ailleurs le `setAttribute` de `_config` lui-même, y compris pour les deux attributs
+conservés par §2.1, et coalesce l'ensemble des nœuds d'un même lot de mutations en un seul rAF — une
+page qui streame vingt composants ne déclenche qu'une frame de traitement.
+
+`dispose` reste synchrone : aucune fuite d'instance sur un nœud retiré avant sa frame de parsing.
+`modify()` vérifie déjà `document.documentElement.contains(target)`, ce qui couvre le cas d'un nœud
+inséré puis retiré dans la même frame.
+
+**Pourquoi `requestAnimationFrame` et non `queueMicrotask`.** Le callback d'un `MutationObserver`
+*est* une microtâche. La chaîne réelle pour un boundary streamé est : (1) React exécute son
+`<script>$RC(…)</script>` inline, qui insère le contenu — synchrone ; (2) fin de tâche, point de
+contrôle des microtâches, le callback de `Stage.observer` s'exécute ; (3) `mutate` → `parse` ;
+(4) React hydrate le boundary dans une tâche de son Scheduler (`MessageChannel`). Un
+`queueMicrotask` émis à l'étape 3 empile dans le **même** point de contrôle, drainé avant de rendre
+la main à la boucle d'événements : il s'exécuterait toujours avant l'étape 4, donc ne différerait
+rien. `Promise.resolve().then()` et `await` ont le même défaut. `requestAnimationFrame` est en outre
+la primitive du moteur — 8 occurrences dans `dsfr.module.js`, contre 0 `queueMicrotask` et
+0 `Promise.resolve` — ce qui compte pour la reprise en PR amont (§5).
+
+**Limite à énoncer, et non à masquer** : rAF est une *heuristique d'ordonnancement*, pas une
+garantie. Le Scheduler de React s'exécute dans une tâche `MessageChannel`, que le navigateur draine
+normalement avant l'étape de rendu — l'hydratation passe donc en général avant le callback rAF. Mais
+React peut découper l'hydratation d'un gros boundary en plusieurs tranches, auquel cas le rAF
+atterrirait au milieu. La seule garantie exacte exigerait un marqueur client à l'intérieur du
+boundary, solution écartée en « Contrainte structurelle ». C'est la mesure de §4.2 qui établit si
+l'heuristique suffit en pratique.
+
+**Contrepartie assumée** : les écouteurs d'événements sont attachés une frame plus tard (~16 ms après
+l'insertion du nœud). Un clic survenant dans cette fenêtre serait perdu. C'est le point le plus
+discutable du design ; il est documenté comme tel dans la PR et couvert par l'assertion fonctionnelle
+de l'e2e (§4.4).
+
+**Portée du changement** : le décalage s'applique à tout nœud ajouté en mode React, y compris lors
+des rendus client postérieurs à l'hydratation. Le parsing initial du document n'est pas concerné : il
+passe par `Registration.introduce()` → `stage.parse(document.documentElement)`, appelé au
+`dsfr.start()` que `react-dsfr` défère déjà à l'hydratation via `DsfrProvider` (§3.2).
 
 ### §2.3 — Aucune autre modification
 
@@ -292,7 +336,7 @@ transposable tel quel en amont.
 
 - Le patch s'appuie exclusivement sur `api.mode === Modes.REACT`, qui existe déjà dans le moteur et
   porte déjà cette intention. Aucun flag privé `react-dsfr`, aucune convention inventée.
-- Les trois modifications de §2 restent indépendantes.
+- Les deux modifications de §2 restent indépendantes.
 - L'audit de la section « Audit » est rédigé pour être repris comme corps de la PR amont : c'est le
   tableau des 46 registrations qui démontre que le changement est borné.
 
