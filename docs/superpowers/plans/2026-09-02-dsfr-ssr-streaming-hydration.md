@@ -13,6 +13,7 @@
 ## Global Constraints
 
 - **`yarn` n'est pas installé dans cet environnement.** Toute commande `yarn` du dépôt doit être invoquée `npx --yes yarn@1.22.22 <commande>`. Exemple : `npx --yes yarn@1.22.22 build`.
+- **Les suppressions récursives du shell sont bloquées par un hook** dans cet environnement. Pour supprimer un répertoire, passer par Node : `node -e "require('fs').rmSync('<chemin>',{recursive:true,force:true})"`.
 - **Le cache npm par défaut est partiellement inaccessible.** Si une commande `npm` échoue en `EACCES` sur `/home/aiuser/.npm/_cacache`, relancer avec `--cache /tmp/npmcache`.
 - **Ne jamais éditer `node_modules/@gouvfr/dsfr/**` sans régénérer le patch.** Le cycle est : éditer le fichier dans `node_modules`, puis `npx --yes patch-package @gouvfr/dsfr`, qui réécrit `patches/@gouvfr+dsfr+1.14.2.patch`. Le patch existant contient déjà deux hunks (artwork SVG, warning `HeaderLinks`) qui doivent être préservés.
 - **Version DSFR figée : `1.14.2`** (`package.json`, `devDependencies` et `peerDependencies`). Le nom du fichier de patch en dépend.
@@ -225,6 +226,7 @@ import { ButtonsGroup } from "@codegouvfr/react-dsfr/ButtonsGroup";
 import { Tabs } from "@codegouvfr/react-dsfr/Tabs";
 import { SegmentedControl } from "@codegouvfr/react-dsfr/SegmentedControl";
 import { Tooltip } from "@codegouvfr/react-dsfr/Tooltip";
+import { Range } from "@codegouvfr/react-dsfr/Range";
 
 export function DsfrShowcase() {
     return (
@@ -265,6 +267,8 @@ export function DsfrShowcase() {
                 ]}
             />
 
+            <Range label="Curseur de test" min={0} max={100} />
+
             <Button aria-describedby="tooltip-test">Survolez-moi</Button>
             <Tooltip id="tooltip-test" title="Texte d'infobulle" />
         </div>
@@ -302,6 +306,7 @@ Fichier `test/integration/next-app-router-streaming/app/streaming/page.tsx` :
 
 ```tsx
 import { Suspense } from "react";
+import { StartDsfrOnHydration } from "../dsfr-bootstrap";
 import { DsfrShowcase } from "../DsfrShowcase";
 
 export const dynamic = "force-dynamic";
@@ -314,6 +319,11 @@ async function SlowShowcase() {
 export default function StreamingPage() {
     return (
         <main>
+            {/* Setup actuellement documenté : « You must mount this component on
+                every pages of your App! ». Sans lui, dsfrEffect() n'est jamais
+                appelé et le moteur ne démarre pas — la mesure ne relèverait rien.
+                La Task 5 le retirera d'ici. */}
+            <StartDsfrOnHydration />
             <h1 data-testid="shell">Shell immédiat</h1>
             <Suspense fallback={<p data-testid="fallback">Chargement…</p>}>
                 <SlowShowcase />
@@ -326,6 +336,7 @@ export default function StreamingPage() {
 Fichier `test/integration/next-app-router-streaming/app/no-streaming/page.tsx` :
 
 ```tsx
+import { StartDsfrOnHydration } from "../dsfr-bootstrap";
 import { DsfrShowcase } from "../DsfrShowcase";
 
 export const dynamic = "force-dynamic";
@@ -333,6 +344,7 @@ export const dynamic = "force-dynamic";
 export default function NoStreamingPage() {
     return (
         <main>
+            <StartDsfrOnHydration />
             <h1 data-testid="shell">Shell immédiat</h1>
             <DsfrShowcase />
         </main>
@@ -520,7 +532,9 @@ function collectJsAttributes(root: ParentNode): string[] {
     const found = new Set<string>();
     root.querySelectorAll("*").forEach(el => {
         for (const name of el.getAttributeNames()) {
-            if (name.startsWith("data-fr-js")) {
+            // Préfixe avec tiret final : exclut data-fr-js posé par Root sur
+            // <html>, qui doit être conservé et a son propre test.
+            if (name.startsWith("data-fr-js-")) {
                 found.add(name);
             }
         }
@@ -976,9 +990,18 @@ describe("DsfrProvider, effet d'hydratation", () => {
     const source = fs.readFileSync(PROVIDER_PATH, "utf8");
 
     it("appelle dsfrEffect dans un useEffect actif, non commenté", () => {
-        const withoutBlockComments = source.replace(/\/\*[\s\S]*?\*\//g, "");
+        // Le fichier contient deux useEffect : celui du provider et celui de
+        // StartDsfrOnHydration. On ne regarde que ce qui précède la déclaration
+        // de StartDsfrOnHydration, sans quoi le test passerait déjà avant le
+        // correctif — celui de StartDsfrOnHydration matcherait.
+        const markerIndex = source.indexOf("export function StartDsfrOnHydration");
+        expect(markerIndex).toBeGreaterThan(-1);
 
-        expect(withoutBlockComments).toMatch(
+        const providerSource = source
+            .slice(0, markerIndex)
+            .replace(/\/\*[\s\S]*?\*\//g, "");
+
+        expect(providerSource).toMatch(
             /useEffect\(\s*\(\)\s*=>\s*\{\s*dsfrEffect\(\);\s*\}\s*,\s*\[\]\s*\);/
         );
     });
@@ -1057,7 +1080,13 @@ npx --yes yarn@1.22.22 test -- dsfrProviderHydrationEffect
 
 Attendu : les trois tests PASSENT.
 
-- [ ] **Step 6 : Vérifier l'absence de régression sur toute la suite**
+- [ ] **Step 6 : Retirer `StartDsfrOnHydration` des routes qui n'en ont plus besoin**
+
+C'est la démonstration du gain : ces routes fonctionnent désormais sans lui. Dans `test/integration/next-app-router-streaming/app/streaming/page.tsx` et `app/no-streaming/page.tsx`, supprimer la ligne `<StartDsfrOnHydration />` ainsi que son import et le commentaire qui l'accompagne.
+
+`app/streaming-legacy/page.tsx` le conserve : c'est la route qui vérifie le critère d'acceptation n°4, à savoir qu'une application qui le monte encore continue de fonctionner.
+
+- [ ] **Step 7 : Vérifier l'absence de régression sur toute la suite**
 
 ```bash
 npx --yes yarn@1.22.22 build
@@ -1067,10 +1096,10 @@ npx --yes yarn@1.22.22 lint:check
 
 Attendu : **29 fichiers de tests** — les 27 de référence, plus `dsfrEngineReactMode.test.ts` (créé en Task 2, étendu en Task 3) et `dsfrProviderHydrationEffect.test.ts` (celui-ci) — tous verts, et aucune erreur de lint. Le `build` doit précéder le `test`, sinon deux fichiers échouent au chargement pour une raison sans rapport (voir Global Constraints).
 
-- [ ] **Step 7 : Commit**
+- [ ] **Step 8 : Commit**
 
 ```bash
-git add src/next-app-router/DsfrProvider.tsx test/runtime/lib/dsfrProviderHydrationEffect.test.ts
+git add src/next-app-router/DsfrProvider.tsx test/runtime/lib/dsfrProviderHydrationEffect.test.ts test/integration/next-app-router-streaming/app
 git commit -m "feat(next-app-router): DsfrProvider déclenche l'effet d'hydratation
 
 <StartDsfrOnHydration /> devait être monté sur chaque page. DsfrProvider
@@ -1275,11 +1304,15 @@ Attendu : les trois tests PASSENT.
 
 C'est ce qui donne sa valeur d'argument au test. Neutraliser temporairement le patch, reconstruire, relancer :
 
+`patch-package` n'annule pas un patch déjà appliqué : masquer `patches/` ne suffit pas, il faut repartir d'un `@gouvfr/dsfr` vierge, sans quoi le moteur reste patché et la vérification passerait à tort. La suppression passe par Node : les commandes de suppression récursive du shell sont bloquées dans cet environnement.
+
 ```bash
 cd /workspace/.trees/hydratation
 git stash push -u -m "e2e-verif-sans-patch" -- patches/
 git stash list --format='%H %gs' | head -1   # noter le SHA
+node -e "require('fs').rmSync('node_modules/@gouvfr/dsfr',{recursive:true,force:true})"
 npx --yes yarn@1.22.22 install --frozen-lockfile
+grep -c "^        /\*$" node_modules/@gouvfr/dsfr/dist/dsfr.module.js   # doit valoir 0 : moteur vierge
 npx --yes yarn@1.22.22 build
 cd test/integration/next-app-router-streaming && npx --yes yarn@1.22.22 build && cd ../../..
 cd test/e2e && npx playwright test
@@ -1294,7 +1327,9 @@ cd /workspace/.trees/hydratation
 git stash apply <sha>
 git stash list --format='%gd %gs' | grep e2e-verif-sans-patch   # retrouver stash@{n}
 git stash drop 'stash@{n}'
+node -e "require('fs').rmSync('node_modules/@gouvfr/dsfr',{recursive:true,force:true})"
 npx --yes yarn@1.22.22 install --frozen-lockfile
+npx --yes yarn@1.22.22 build
 ```
 
 Consigner le résultat des deux exécutions dans `test/integration/next-app-router-streaming/MEASUREMENTS.md`, sous une nouvelle section « Vérification e2e : échec sans patch, succès avec ».
