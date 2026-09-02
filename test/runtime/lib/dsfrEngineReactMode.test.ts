@@ -151,10 +151,7 @@ describe("moteur @gouvfr/dsfr, contrat du mode react", () => {
 
         await new Promise(resolve => setTimeout(resolve, 80));
 
-        expect(collectJsAttributes(holder)).toEqual([
-            "data-fr-js-range",
-            "data-fr-js-table"
-        ]);
+        expect(collectJsAttributes(holder)).toEqual(["data-fr-js-range", "data-fr-js-table"]);
 
         window.close();
     });
