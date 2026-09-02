@@ -65,6 +65,9 @@ async function loadEngine(params: { mode: "react" | "auto" }) {
 
     const window = dom.window as DOMWindow;
 
+    /* eslint-disable @typescript-eslint/no-empty-function -- stubs de test : les
+       corps vides sont le comportement voulu, DSFR n'a besoin que de la présence
+       de ces méthodes, pas de leur effet. */
     class ObserverStub {
         observe() {}
         unobserve() {}
@@ -81,6 +84,7 @@ async function loadEngine(params: { mode: "react" | "auto" }) {
         addEventListener() {},
         removeEventListener() {}
     });
+    /* eslint-enable @typescript-eslint/no-empty-function */
     (window as any).dsfr = { verbose: false, mode };
 
     (window as any).eval(fs.readFileSync(ENGINE_PATH, "utf8"));
@@ -174,6 +178,42 @@ describe("moteur @gouvfr/dsfr, contrat du mode react", () => {
         const button = window.document.querySelector(".fr-accordion__btn") as HTMLElement;
         expect(button.getAttribute("aria-expanded")).toBe("false");
 
+        button.click();
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        expect(button.getAttribute("aria-expanded")).toBe("true");
+
+        window.close();
+    });
+
+    it("ne double pas l'instanciation d'un nœud retiré puis réinséré dans le même lot", async () => {
+        const { window } = await loadEngine({ mode: "react" });
+
+        const holder = window.document.createElement("div");
+        holder.innerHTML = `
+<section class="fr-accordion">
+  <h3 class="fr-accordion__title">
+    <button class="fr-accordion__btn" aria-expanded="false" aria-controls="dup-1">Titre</button>
+  </h3>
+  <div class="fr-collapse" id="dup-1">contenu</div>
+</section>`;
+
+        // Retiré puis réinséré de façon synchrone, avant que le MutationObserver
+        // ne délivre son callback (une microtâche) : les mutations « ajout »,
+        // « retrait », « ajout » de ce même nœud arrivent groupées dans le même
+        // appel à mutate(), exerçant this.modifications.indexOf(node) === -1,
+        // qui évite de pousser deux fois le même nœud dans la file différée.
+        window.document.body.appendChild(holder);
+        window.document.body.removeChild(holder);
+        window.document.body.appendChild(holder);
+
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        const button = window.document.querySelector(".fr-accordion__btn") as HTMLElement;
+        expect(button.getAttribute("aria-expanded")).toBe("false");
+
+        // Un seul écouteur attaché : un clic ne doit produire qu'un seul
+        // basculement, pas un aller-retour false -> true -> false.
         button.click();
         await new Promise(resolve => setTimeout(resolve, 80));
 
