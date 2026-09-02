@@ -8,7 +8,7 @@ index e4d335c..6c53dce 100644
  </svg>
 +<!-- Slightly increasing size so it reaches the threshold that will prevent it from being inlined by Vite. -->
 diff --git a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-index 0640386..7d7ec26 100644
+index 0640386..0bec0e5 100644
 --- a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 +++ b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 @@ -202,6 +202,12 @@ const Modes = {
@@ -24,7 +24,24 @@ index 0640386..7d7ec26 100644
  const dispatch = (node, type, detail = null, bubbles = true, cancelable = false) => {
    const options = { bubbles: bubbles === true, cancelable: cancelable === true };
    if (detail) options.detail = detail;
-@@ -1589,7 +1595,7 @@ class Instance {
+@@ -834,7 +840,15 @@ class Stage extends Module {
+       switch (mutation.type) {
+         case 'childList':
+           mutation.removedNodes.forEach((node) => this.dispose(node));
+-          mutation.addedNodes.forEach((node) => this.parse(node));
++          mutation.addedNodes.forEach((node) => {
++            // En mode react, les nœuds ajoutés empruntent le chemin différé déjà
++            // utilisé pour les mutations d'attributs : this.modifications est rejoué
++            // par modify() au requestAnimationFrame suivant. Cela laisse à React le
++            // temps d'hydrater le contenu avant que le moteur ne le mute.
++            if (options.mode === Modes.REACT) {
++              if (this.modifications.indexOf(node) === -1) this.modifications.push(node);
++            } else this.parse(node);
++          });
+           break;
+ 
+         case 'attributes':
+@@ -1589,7 +1603,7 @@ class Instance {
      this.registration = registration;
      this.node = element.node;
      this.id = element.node.id;
@@ -33,7 +50,7 @@ index 0640386..7d7ec26 100644
      this.init();
    }
  
-@@ -6461,9 +6467,11 @@ class HeaderLinks extends api.core.Instance {
+@@ -6461,9 +6475,11 @@ class HeaderLinks extends api.core.Instance {
        case api.Modes.ANGULAR:
        case api.Modes.REACT:
        case api.Modes.VUE:

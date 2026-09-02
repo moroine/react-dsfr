@@ -124,4 +124,64 @@ describe("moteur @gouvfr/dsfr, contrat du mode react", () => {
 
         window.close();
     });
+
+    it("ne mute pas un nœud inséré tant que la frame n'est pas passée", async () => {
+        const { window } = await loadEngine({ mode: "react" });
+
+        const holder = window.document.createElement("div");
+        holder.innerHTML = MARKUP;
+        window.document.body.appendChild(holder);
+
+        // Le callback d'un MutationObserver est une microtâche : on se place juste
+        // après le point de contrôle, là où React n'a pas encore pu hydrater.
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(collectJsAttributes(holder)).toEqual([]);
+
+        window.close();
+    });
+
+    it("instrumente le nœud inséré une frame plus tard", async () => {
+        const { window } = await loadEngine({ mode: "react" });
+
+        const holder = window.document.createElement("div");
+        holder.innerHTML = MARKUP;
+        window.document.body.appendChild(holder);
+
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        expect(collectJsAttributes(holder)).toEqual([
+            "data-fr-js-range",
+            "data-fr-js-table"
+        ]);
+
+        window.close();
+    });
+
+    it("pilote le contenu inséré tardivement", async () => {
+        const { window } = await loadEngine({ mode: "react" });
+
+        const holder = window.document.createElement("div");
+        holder.innerHTML = `
+<section class="fr-accordion">
+  <h3 class="fr-accordion__title">
+    <button class="fr-accordion__btn" aria-expanded="false" aria-controls="late-1">Titre</button>
+  </h3>
+  <div class="fr-collapse" id="late-1">contenu</div>
+</section>`;
+        window.document.body.appendChild(holder);
+
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        const button = window.document.querySelector(".fr-accordion__btn") as HTMLElement;
+        expect(button.getAttribute("aria-expanded")).toBe("false");
+
+        button.click();
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        expect(button.getAttribute("aria-expanded")).toBe("true");
+
+        window.close();
+    });
 });
