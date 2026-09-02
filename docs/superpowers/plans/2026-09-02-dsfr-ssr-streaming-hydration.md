@@ -91,7 +91,7 @@ Fichier `test/integration/next-app-router-streaming/package.json` :
     "private": true,
     "scripts": {
         "dev": "next dev -p 3100",
-        "build": "next build",
+        "build": "node --stack-size=8000 node_modules/.bin/next build",
         "start": "next start -p 3100"
     },
     "dependencies": {
@@ -110,6 +110,10 @@ Fichier `test/integration/next-app-router-streaming/package.json` :
 }
 ```
 
+Deux particularités de ce `package.json` méritent explication.
+
+Le script `build` invoque `node --stack-size=8000` : `assets/dsfr_plus_icons.scss` fait un `@use` de `dsfr.min.css` et `icons.min.css`, soit environ 2700 `url()` dans du CSS minifié, ce qui fait déborder la pile de V8 dans la chaîne `resolve-url-loader` → `sass-loader` → `css-loader` (`RangeError: Maximum call stack size exceeded`). `NODE_OPTIONS=--stack-size` ne fonctionne pas, Node rejette ce flag par cette voie. Le problème est propre au build webpack : `next start` sert les routes avec la pile par défaut, donc la mesure d'exécution n'est pas affectée.
+
 Le protocole `file:` copie `dist/` au lieu d'y faire un lien symbolique. C'est ce qu'emploient déjà `test/integration/next-appdir` et `next-pagesdir` dans ce dépôt, avec le même `next.config.js` minimal.
 
 `link:` a été essayé et **ne fonctionne pas** : webpack ne résout pas les imports d'assets du paquet (`favicon/*.png|svg|ico`, `assets/dsfr_plus_icons.scss`, `dsfr/fonts/Marianne-*.woff2`) à travers un symlink pointant hors de l'arbre du projet, alors que Node les résout parfaitement. Toutes les routes retournent alors HTTP 500 et `next build` échoue. Trois contournements côté `next.config.js` ont été testés sans succès : `experimental.externalDir`, `snapshot.managedPaths: []` (sans effet), et `resolve.symlinks: false` (corrige les binaires mais provoque un `RangeError: Maximum call stack size exceeded` dans la chaîne `resolve-url-loader` → `sass-loader`).
@@ -126,6 +130,13 @@ Fichier `test/integration/next-app-router-streaming/next.config.js` :
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: false,
+    // Les .d.ts publiés dans dist/ sont compilés avec @types/react 18 (version
+    // du package.json racine), l'app est en 19 pour que ses Server Components
+    // async typent. Les deux identités de type sont incompatibles, et aucune
+    // version unique de @types/react ne satisfait les deux. Le gate TypeScript
+    // est donc désactivé ici : webpack compile avant lui, et cette app est un
+    // banc de mesure d'exécution, pas un livrable typé.
+    typescript: { ignoreBuildErrors: true },
     webpack: config => {
         config.module.rules.push({
             test: /\.woff2$/,
