@@ -1398,6 +1398,88 @@ n'impose pas au dépôt."
 
 ---
 
+### Task 8 : Corriger les trois mécanismes de divergence résiduels
+
+Les Tasks 2 et 3 suppriment les 44 attributs `data-fr-js-*` superflus — vérifié par instrumentation à l'échelle d'une page de 19 familles. Trois divergences d'hydratation appariées subsistent néanmoins sur les routes de streaming, par trois mécanismes distincts. Cette tâche les traite.
+
+**Files:**
+- Modify: `node_modules/@gouvfr/dsfr/dist/dsfr.module.js` puis régénération de `patches/@gouvfr+dsfr+1.14.2.patch`
+- Test: `test/runtime/lib/dsfrEngineReactMode.test.ts` (étendu)
+
+**Interfaces:**
+- Consumes: `loadEngine({ mode })` et `collectJsAttributes(root)` déjà définis dans le fichier de test.
+- Produces: rien de nouveau.
+
+**Les trois mécanismes, diagnostiqués et localisés :**
+
+| Famille | Mécanisme | Divergence observée |
+|---|---|---|
+| `tab` | `TabsGroup` surcharge `getIndex()` en passant `defaultIndex = 0`, là où `DisclosuresGroup.getIndex(defaultIndex = -1)` (l.2659) ne force rien. C'est la seule famille Disclosure à imposer une sélection. | `style` du conteneur (`--tabs-height`) et `className` du panneau (`--direction-end`) |
+| `header` | `HeaderModal.storeAria()` **retire** `aria-labelledby` et `aria-label` à l'init, pour les restaurer plus tard. | `aria-labelledby` sur le `.fr-modal` du menu mobile : `null` côté DOM → `"fr-header-menu-button"` côté client |
+| `navigation` | Le `fr-collapse` reçoit la classe transitoire `fr-collapsing` et la variable CSS `--collapse` à l'initialisation — une mesure de hauteur appliquée avant hydratation. | `className` et `style` du `fr-collapse` |
+
+**Principe directeur, identique aux Tasks 2 et 3 :** en `mode: "react"`, le moteur ne doit rien imposer que le DOM exprime déjà. Le HTML rendu par le serveur porte l'état correct — c'est vérifié pour les onglets, où le HTML servi contient bien un `aria-selected="true"` et un panneau `--selected`. Le moteur doit donc **lire** cet état plutôt que le réécrire.
+
+- [ ] **Step 1 : Protocole de mesure — à appliquer avant CHAQUE mesure**
+
+`yarn install --force` ne suffit pas. Une dépendance `file:` change de contenu sans changer de version, et webpack traite `node_modules` comme immuable : `next dev` sert alors un chunk compilé périmé. Avant toute mesure :
+
+```bash
+cd /workspace/.trees/hydratation
+npx --yes yarn@1.22.22 build
+cd test/integration/next-app-router-streaming
+npx --yes yarn@1.22.22 install --force
+node -e "require('fs').rmSync('.next',{recursive:true,force:true})"
+```
+
+Ce point a faussé plusieurs mesures de ce projet. Ne le saute jamais.
+
+- [ ] **Step 2 : Établir la mesure de départ, famille par famille**
+
+Les routes d'isolation `/streaming/family/<id>` rendent une seule famille, ce qui évite la troncature du diff React (il s'arrête après la 7e famille sur une page combinée). Relever l'état de `tab`, `header` et `navigation` avant toute modification, avec les divergences appariées citées verbatim.
+
+- [ ] **Step 3 : Corriger `tab`**
+
+Dans `node_modules/@gouvfr/dsfr/dist/dsfr.module.js`, repérer la surcharge de `getIndex` par `TabsGroup` (chercher `getIndex (` dans la classe `TabsGroup`). En mode react, ne pas forcer d'index par défaut : laisser le comportement de `DisclosuresGroup`, qui retourne `-1` quand aucun membre n'est ouvert. Le DOM issu du SSR exprimant déjà la sélection, le balayage la retrouvera.
+
+Employer `options.mode !== Modes.REACT` — jamais `api.mode`, `api` étant déclaré après `Stage` et `Instance`.
+
+- [ ] **Step 4 : Mesurer `tab`, puis commiter**
+
+Régénérer le patch, reconstruire selon le Step 1, remesurer `/streaming/family/tab`. Si la divergence disparaît, commiter. Sinon, ne pas commiter et consigner ce que la mesure montre.
+
+- [ ] **Step 5 : Corriger `header`**
+
+`HeaderModal.storeAria()` retire les attributs `aria-*`. En mode react, ne pas les retirer — le DOM porte déjà la bonne valeur et React l'attend. Vérifier que `restoreAria()` reste cohérent.
+
+- [ ] **Step 6 : Mesurer `header`, puis commiter** — même protocole qu'au Step 4, sur `/streaming/family/header`.
+
+- [ ] **Step 7 : Corriger `navigation`**
+
+Le mécanisme est le moins évident des trois : identifier où `fr-collapsing` et `--collapse` sont posés à l'initialisation, et neutraliser cette pose initiale en mode react sans casser l'animation d'ouverture ultérieure, qui doit continuer de fonctionner.
+
+- [ ] **Step 8 : Mesurer `navigation`, puis commiter** — même protocole, sur `/streaming/family/navigation`.
+
+- [ ] **Step 9 : Tests de garde**
+
+Étendre `test/runtime/lib/dsfrEngineReactMode.test.ts` d'un test par correctif effectivement appliqué. Chacun doit échouer sans son correctif — le vérifier et le consigner, sans quoi le test ne vaut rien.
+
+- [ ] **Step 10 : Non-régression fonctionnelle**
+
+Le risque de cette tâche est de casser le fonctionnement. Vérifier dans un navigateur que les onglets changent au clic, que le menu mobile du header s'ouvre, et que la navigation se déplie. Un correctif qui supprime la divergence en cassant le composant est un échec, pas un succès.
+
+- [ ] **Step 11 : Suite complète**
+
+```bash
+npx --yes yarn@1.22.22 build
+npx --yes yarn@1.22.22 test
+npx --yes yarn@1.22.22 lint:check
+```
+
+Tous verts, un seul avertissement préexistant sur `src/Notice.tsx` toléré. Vérifier que les hunks préexistants du patch ont survécu.
+
+---
+
 ### Task 7 : Préparation de la PR
 
 **Files:**
