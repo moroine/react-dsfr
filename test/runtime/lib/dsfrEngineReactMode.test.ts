@@ -57,6 +57,20 @@ const TABS_MARKUP = `
 </div>
 `;
 
+// Modale ouverte par défaut contenant un déclencheur d'infobulle — reproduit
+// une <Tooltip> montée à l'intérieur d'une <Modal> ouverte.
+const TOOLTIP_IN_MODAL_MARKUP = `
+<button class="fr-btn" aria-controls="modal-esc" data-fr-opened="true">Ouvrir</button>
+<dialog class="fr-modal" id="modal-esc" aria-labelledby="modal-esc-title">
+  <div class="fr-modal__body">
+    <h1 id="modal-esc-title">Titre</h1>
+    <a href="#" id="tip-ref" aria-describedby="tip-1">Déclencheur</a>
+    <span class="fr-tooltip fr-placement" id="tip-1" role="tooltip" aria-hidden="true">Aide</span>
+    <a href="#" id="plain-ref">Lien ordinaire</a>
+  </div>
+</dialog>
+`;
+
 // Menu mobile du header, avec aria-labelledby déjà posé par le serveur —
 // reproduit .fr-header__menu.fr-modal tel que <Header> le rend.
 const HEADER_MARKUP = `
@@ -138,6 +152,26 @@ async function loadEngine(params: {
         removeEventListener() {}
     });
     /* eslint-enable @typescript-eslint/no-empty-function */
+
+    // jsdom ne calcule pas les valeurs par défaut des propriétés de mise en
+    // page : getComputedStyle(el).overflow y vaut "", et Tooltip.getSafeArea()
+    // exécute dessus une expression régulière dont il déréférence le résultat
+    // sans le tester. On complète donc la valeur manquante, comme les stubs
+    // d'observateurs ci-dessus.
+    const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+    (window as any).getComputedStyle = (element: Element, pseudoElement?: string | null) => {
+        const style = nativeGetComputedStyle(element, pseudoElement ?? undefined);
+        return new Proxy(style, {
+            get(target, property) {
+                const value = (target as any)[property];
+                if (property === "overflow" && !value) {
+                    return "visible";
+                }
+                return typeof value === "function" ? value.bind(target) : value;
+            }
+        });
+    };
+
     (window as any).dsfr = { verbose: false, mode };
 
     (window as any).eval(fs.readFileSync(ENGINE_PATH, "utf8"));
@@ -150,7 +184,7 @@ async function loadEngine(params: {
 }
 
 describe("moteur @gouvfr/dsfr, contrat du mode react", () => {
-    it("ne pose que les data-fr-js-* dont le CSS dépend", async () => {
+    it("ne pose que les data-fr-js-* requis par le CSS ou par le moteur", async () => {
         const { window } = await loadEngine({ mode: "react" });
 
         expect(collectJsAttributes(window.document)).toEqual([
@@ -279,7 +313,7 @@ describe("moteur @gouvfr/dsfr, contrat du mode react", () => {
     // retirant temporairement le hunk correspondant du fichier moteur avant
     // de le restaurer (voir task-8-report.md).
 
-    it("tab : ne pose ni --tabs-height, ni --tabs-list-height, ni --direction-end sur un contenu inséré tardivement", async () => {
+    it("tab : ne pose aucune classe de direction à la synchronisation initiale", async () => {
         // Contenu inséré après coup (comme le contenu streamé dans l'app
         // réelle), plutôt que présent dès dsfr.start() : évite que
         // document.fonts.ready (déclencheur global, à usage unique, du
@@ -294,17 +328,117 @@ describe("moteur @gouvfr/dsfr, contrat du mode react", () => {
 
         await new Promise(resolve => setTimeout(resolve, 80));
 
-        const tabs = holder.querySelector("#tabs-1") as HTMLElement;
-        const list = holder.querySelector(".fr-tabs__list") as HTMLElement;
         const secondPanel = holder.querySelector("#tabpanel-2-panel") as HTMLElement;
 
-        // Le HTML rendu par le serveur ne porte ni --tabs-height (conteneur),
-        // ni --tabs-list-height (liste), ni fr-tabs__panel--direction-end sur
-        // le panneau non sélectionné : le moteur ne doit rien y ajouter tant
-        // qu'aucun changement d'onglet réel n'a eu lieu.
-        expect(tabs.style.getPropertyValue("--tabs-height")).toBe("");
-        expect(list.style.getPropertyValue("--tabs-list-height")).toBe("");
+        // Le HTML rendu par le serveur ne porte pas
+        // fr-tabs__panel--direction-end sur le panneau non sélectionné : le
+        // moteur ne doit pas l'ajouter tant qu'aucun changement d'onglet réel
+        // n'a eu lieu. Ces classes ne servent qu'à préparer une transition.
         expect(secondPanel.className).not.toContain("--direction-end");
+
+        window.close();
+    });
+
+    it("tab : pose bien --tabs-height une fois la fenêtre d'hydratation passée", async () => {
+        // Garde-fou de non-régression : le rendu du groupe d'onglets est
+        // DIFFÉRÉ, pas désactivé. Sans --tabs-height, .fr-tabs reste en
+        // height:auto et prend la hauteur du panneau le plus haut — tous les
+        // panneaux étant superposés dans le même flux — soit des centaines de
+        // pixels de vide sous le panneau visible jusqu'au premier clic.
+        const { window } = await loadEngine({ mode: "react" });
+
+        const holder = window.document.createElement("div");
+        holder.innerHTML = TABS_MARKUP;
+        window.document.body.appendChild(holder);
+
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        const tabs = holder.querySelector("#tabs-1") as HTMLElement;
+
+        expect(tabs.style.getPropertyValue("--tabs-height")).not.toBe("");
+
+        window.close();
+    });
+
+    it("collapse : la première ouverture d'un accordéon non groupé garde l'animation", async () => {
+        // Garde-fou de non-régression : un fr-collapse non groupé — ce que
+        // rend CHAQUE <Accordion>, react-dsfr ne rendant jamais
+        // fr-accordions-group — ne voit tourner aucun disclose() à
+        // l'initialisation. Un prédicat fondé sur « aucun disclose n'a encore
+        // tourné » ferait donc prendre le chemin rapide, sans animation, au
+        // PREMIER CLIC UTILISATEUR. Le prédicat doit porter sur l'état réel du
+        // DOM.
+        const { window } = await loadEngine({ mode: "react" });
+
+        const collapse = window.document.getElementById("acc-1") as HTMLElement;
+        const button = window.document.querySelector(".fr-accordion__btn") as HTMLElement;
+
+        // Synchronisation initiale : rien de transitoire n'a été posé.
+        expect(collapse.className).not.toContain("fr-collapsing");
+        expect(collapse.style.getPropertyValue("--collapse")).toBe("");
+
+        button.click();
+
+        // Immédiatement après le clic : le moteur a engagé la transition
+        // (classe fr-collapsing + variable --collapse), ce que le chemin
+        // rapide court-circuitait.
+        expect(collapse.className).toContain("fr-collapsing");
+        expect(collapse.style.getPropertyValue("--collapse")).not.toBe("");
+
+        await new Promise(resolve => setTimeout(resolve, 80));
+        expect(button.getAttribute("aria-expanded")).toBe("true");
+
+        window.close();
+    });
+
+    it("modal : conserve data-fr-js-tooltip-referent, lu par le moteur lui-même", async () => {
+        const { window } = await loadEngine({
+            mode: "react",
+            markup: TOOLTIP_IN_MODAL_MARKUP
+        });
+
+        expect(
+            window.document.getElementById("tip-ref")?.hasAttribute("data-fr-js-tooltip-referent")
+        ).toBe(true);
+
+        window.close();
+    });
+
+    it("modal : Échap sur un déclencheur d'infobulle ne ferme pas la modale", async () => {
+        // Régression d'accessibilité si data-fr-js-tooltip-referent est
+        // supprimé : Modal._escape() lit cet attribut sur document.activeElement
+        // pour laisser Échap fermer l'infobulle seule. Sans lui, Échap ferme
+        // toute la modale.
+        const { window } = await loadEngine({
+            mode: "react",
+            markup: TOOLTIP_IN_MODAL_MARKUP
+        });
+
+        const modal = window.document.getElementById("modal-esc") as HTMLElement;
+
+        expect(modal.className).toContain("fr-modal--opened");
+
+        const pressEscape = (target: HTMLElement) => {
+            target.focus();
+            const event = new window.KeyboardEvent("keydown", {
+                key: "Escape",
+                bubbles: true
+            });
+            Object.defineProperty(event, "keyCode", { value: 27 });
+            window.document.documentElement.dispatchEvent(event);
+        };
+
+        pressEscape(window.document.getElementById("tip-ref") as HTMLElement);
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(modal.className).toContain("fr-modal--opened");
+
+        // Contrôle : depuis un élément ordinaire, Échap ferme bien la modale —
+        // le test ci-dessus ne passe donc pas parce que Échap serait inopérant.
+        pressEscape(window.document.getElementById("plain-ref") as HTMLElement);
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(modal.className).not.toContain("fr-modal--opened");
 
         window.close();
     });
@@ -322,9 +456,9 @@ describe("moteur @gouvfr/dsfr, contrat du mode react", () => {
             matchMediaMatches: true
         });
 
-        expect(window.document.getElementById("header-menu-modal-1")?.getAttribute("aria-labelledby")).toBe(
-            "header-menu-btn-1"
-        );
+        expect(
+            window.document.getElementById("header-menu-modal-1")?.getAttribute("aria-labelledby")
+        ).toBe("header-menu-btn-1");
 
         window.close();
     });
