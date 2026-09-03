@@ -8,7 +8,7 @@ index e4d335c..6c53dce 100644
  </svg>
 +<!-- Slightly increasing size so it reaches the threshold that will prevent it from being inlined by Vite. -->
 diff --git a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-index 0640386..20a4d4a 100644
+index 0640386..9c0baa2 100644
 --- a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 +++ b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 @@ -202,6 +202,12 @@ const Modes = {
@@ -72,7 +72,7 @@ index 0640386..20a4d4a 100644
      this.collapsing(() => super.conceal(withhold, preventFocus));
    }
  
-@@ -5477,11 +5500,17 @@ class TabsGroup extends api.core.DisclosuresGroup {
+@@ -5477,7 +5500,10 @@ class TabsGroup extends api.core.DisclosuresGroup {
      this.listen('transitionend', this.transitionend.bind(this));
      this.addAscent(TabEmission.PRESS_KEY, this.pressKey.bind(this));
      this.addAscent(TabEmission.LIST_HEIGHT, this.setListHeight.bind(this));
@@ -84,15 +84,7 @@ index 0640386..20a4d4a 100644
    }
  
    getIndex (defaultIndex = 0) {
--    super.getIndex(defaultIndex);
-+    // En mode react, le HTML rendu par le serveur porte déjà la sélection
-+    // (aria-selected, --selected) : ne pas en forcer une par défaut, laisser
-+    // DisclosuresGroup.getIndex retomber sur -1 et balayer les membres.
-+    super.getIndex(options.mode === Modes.REACT ? -1 : defaultIndex);
-   }
- 
-   get list () {
-@@ -5579,6 +5608,19 @@ class TabsGroup extends api.core.DisclosuresGroup {
+@@ -5579,6 +5605,19 @@ class TabsGroup extends api.core.DisclosuresGroup {
    }
  
    apply () {
@@ -112,23 +104,24 @@ index 0640386..20a4d4a 100644
      for (let i = 0; i < this._index; i++) this.members[i].translate(TabPanelDirection.START);
      if (this.current) this.current.translate(TabPanelDirection.NONE);
      for (let i = this._index + 1; i < this.length; i++) this.members[i].translate(TabPanelDirection.END);
-@@ -5678,6 +5720,15 @@ class TabsList extends api.core.Instance {
-   }
- 
+@@ -5680,7 +5719,15 @@ class TabsList extends api.core.Instance {
    resize () {
-+    // En mode react, la toute première mesure (déclenchée synchroniquement
-+    // au montage par isResizing = true) ne pose pas --tabs-list-height : le
-+    // HTML rendu par le serveur ne le porte pas, et rien ne le justifie
-+    // avant un redimensionnement réel (fenêtre, police, orientation).
-+    if (options.mode === Modes.REACT && !this._hasResized) {
-+      this._hasResized = true;
-+      return;
-+    }
-+    this._hasResized = true;
      this.isScrolling = this.node.scrollWidth > this.node.clientWidth + SCROLL_OFFSET$1;
      const height = this.getRect().height;
-     this.setProperty('--tabs-list-height', `${height}px`);
-@@ -6461,9 +6512,11 @@ class HeaderLinks extends api.core.Instance {
+-    this.setProperty('--tabs-list-height', `${height}px`);
++    // En mode react, ne pas poser --tabs-list-height dès la toute première
++    // mesure (déclenchée synchroniquement au montage par isResizing = true) :
++    // le HTML rendu par le serveur ne le porte pas, et rien ne le justifie
++    // avant un redimensionnement réel (fenêtre, police, orientation).
++    // isScrolling et la valeur ascendante restent calculés normalement :
++    // seule cette variable CSS divergeait du SSR.
++    const isInitialReactSync = options.mode === Modes.REACT && !this._hasResized;
++    this._hasResized = true;
++    if (!isInitialReactSync) this.setProperty('--tabs-list-height', `${height}px`);
+     this.ascend(TabEmission.LIST_HEIGHT, height);
+   }
+ 
+@@ -6461,9 +6508,11 @@ class HeaderLinks extends api.core.Instance {
        case api.Modes.ANGULAR:
        case api.Modes.REACT:
        case api.Modes.VUE:
@@ -140,7 +133,7 @@ index 0640386..20a4d4a 100644
          break;
  
        default:
-@@ -6513,6 +6566,11 @@ class HeaderModal extends api.core.Instance {
+@@ -6513,6 +6562,11 @@ class HeaderModal extends api.core.Instance {
    storeAria () {
      if (this.hasAttribute('aria-labelledby')) this._ariaLabelledby = this.getAttribute('aria-labelledby');
      if (this.hasAttribute('aria-label')) this._ariaLabel = this.getAttribute('aria-label');
