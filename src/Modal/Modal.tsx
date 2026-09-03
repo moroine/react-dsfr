@@ -253,18 +253,51 @@ export function createModal(params: { isOpenedByDefault: boolean; id: string }):
 
     overwriteReadonlyProp(Component as any, "name", Component.displayName);
 
-    function open() {
+    // In "react" mode the DSFR engine instruments freshly inserted nodes one
+    // animation frame later, so that React can finish hydrating them first.
+    // During that frame the modal element is already in the DOM but
+    // `window.dsfr(element).modal` is still `undefined`: calling `open()` right
+    // after mount — a legitimate use of the public API — would throw.
+    //
+    // We only retry in that precise situation: the element is there, the engine
+    // instance is not yet. Anything else (no element at all, no engine at all)
+    // goes straight through so that a genuine misuse still throws the same
+    // error as before instead of being silently swallowed.
+    const maxFramesWaitingForTheEngineToInstrumentTheModal = 10;
+
+    function callOnModalInstance(
+        methodName: "disclose" | "conceal",
+        remainingFrames: number = maxFramesWaitingForTheEngineToInstrumentTheModal
+    ) {
+        // @ts-expect-error: Property 'dsfr' does not exist on type 'Window & typeof globalThis'.ts(2339)
+        const dsfr: undefined | ((node: HTMLElement) => any) = window.dsfr;
+
         const modalElement = document.getElementById(id);
 
+        if (modalElement !== null && typeof dsfr === "function" && remainingFrames > 0) {
+            const modalInstance = dsfr(modalElement)?.modal;
+
+            if (modalInstance === undefined) {
+                window.requestAnimationFrame(() =>
+                    callOnModalInstance(methodName, remainingFrames - 1)
+                );
+                return;
+            }
+
+            modalInstance[methodName]();
+            return;
+        }
+
         // @ts-expect-error: Property 'dsfr' does not exist on type 'Window & typeof globalThis'.ts(2339)
-        window.dsfr(modalElement).modal.disclose();
+        window.dsfr(modalElement).modal[methodName]();
+    }
+
+    function open() {
+        callOnModalInstance("disclose");
     }
 
     function close() {
-        const modalElement = document.getElementById(id);
-
-        // @ts-expect-error: Property 'dsfr' does not exist on type 'Window & typeof globalThis'.ts(2339)
-        window.dsfr(modalElement).modal.conceal();
+        callOnModalInstance("conceal");
     }
 
     return {
