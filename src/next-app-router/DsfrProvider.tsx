@@ -124,10 +124,10 @@ function dsfrEffect(): void {
 }
 
 /**
- * @deprecated Ce composant n'est plus nécessaire : `DsfrProvider` déclenche
- * désormais lui-même l'effet d'hydratation. Il reste exporté et pleinement
- * fonctionnel — `dsfrEffect()` est idempotent — pour ne pas casser les
- * applications qui le montent déjà. Vous pouvez le retirer de vos pages.
+ * @deprecated This component is no longer needed: `DsfrProvider` now triggers
+ * the hydration effect itself. It remains exported and fully functional —
+ * `dsfrEffect()` is idempotent — so that applications already mounting it keep
+ * working. You can safely remove it from your pages.
  */
 export function StartDsfrOnHydration() {
     useEffect(() => {
