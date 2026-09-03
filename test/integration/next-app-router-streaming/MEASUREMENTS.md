@@ -1,3 +1,23 @@
+> **⚠️ Document historique — état ANTÉRIEUR aux correctifs.**
+>
+> Ce relevé date du 2026-09-02. Il documente l'état de **référence**, mesuré
+> sur `main` puis au tout début de la branche, **avant** les correctifs du
+> moteur. Ses conclusions — notamment « les tests échouent à l'identique avec
+> et sans le patch » — décrivent cet état de départ et **ne valent plus** pour
+> l'état actuel de la branche. Elles ont de plus été mesurées avec un protocole
+> depuis reconnu insuffisant : `.next` n'était pas supprimé avant la mesure,
+> si bien que le serveur de développement pouvait servir un chunk compilé
+> d'avant le patch.
+>
+> Sa valeur est d'être un **état daté** : il n'est donc pas réécrit. Pour
+> l'état courant, voir :
+>
+> - [`COVERAGE.md`](./COVERAGE.md) — couverture par famille moteur et résultats
+>   de mesure à jour ;
+> - [`LOAD-EFFECT.md`](./LOAD-EFFECT.md) — protocole de mesure obligatoire
+>   (suppression de `.next` avant toute mesure) et résolution du bruit
+>   `data-fr-js-*`.
+
 # Relevé de référence — hydratation et streaming
 
 Mesuré le 2026-09-02 sur `7f0607953f0c38e8a7569c2a079f8129845a709f` (`main`,
