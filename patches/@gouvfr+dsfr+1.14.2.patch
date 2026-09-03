@@ -8,7 +8,7 @@ index e4d335c..6c53dce 100644
  </svg>
 +<!-- Slightly increasing size so it reaches the threshold that will prevent it from being inlined by Vite. -->
 diff --git a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-index 0640386..0bec0e5 100644
+index 0640386..91ebf68 100644
 --- a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 +++ b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 @@ -202,6 +202,12 @@ const Modes = {
@@ -50,7 +50,63 @@ index 0640386..0bec0e5 100644
      this.init();
    }
  
-@@ -6461,9 +6475,11 @@ class HeaderLinks extends api.core.Instance {
+@@ -5477,11 +5491,17 @@ class TabsGroup extends api.core.DisclosuresGroup {
+     this.listen('transitionend', this.transitionend.bind(this));
+     this.addAscent(TabEmission.PRESS_KEY, this.pressKey.bind(this));
+     this.addAscent(TabEmission.LIST_HEIGHT, this.setListHeight.bind(this));
+-    this.isRendering = true;
++    // En mode react, ne pas s'inscrire au rendu tant qu'aucun changement
++    // d'onglet réel n'a eu lieu : apply() l'active elle-même dès le premier
++    // changement qui n'est pas la synchronisation initiale (voir apply()).
++    if (options.mode !== Modes.REACT) this.isRendering = true;
+   }
+ 
+   getIndex (defaultIndex = 0) {
+-    super.getIndex(defaultIndex);
++    // En mode react, le HTML rendu par le serveur porte déjà la sélection
++    // (aria-selected, --selected) : ne pas en forcer une par défaut, laisser
++    // DisclosuresGroup.getIndex retomber sur -1 et balayer les membres.
++    super.getIndex(options.mode === Modes.REACT ? -1 : defaultIndex);
+   }
+ 
+   get list () {
+@@ -5579,6 +5599,19 @@ class TabsGroup extends api.core.DisclosuresGroup {
+   }
+ 
+   apply () {
++    // En mode react, la toute première application (synchronisation de
++    // l'onglet déjà sélectionné par le HTML rendu par le serveur) ne pose
++    // aucune classe de direction ni ne s'inscrit au rendu : le DOM exprime
++    // déjà l'état final, il n'y a rien à préparer pour une transition. Les
++    // applications suivantes, déclenchées par une vraie interaction
++    // (flèches, clic), gardent le comportement complet.
++    if (options.mode === Modes.REACT && !this._hasApplied) {
++      this._hasApplied = true;
++      this.isPreventingTransition = false;
++      return;
++    }
++    this._hasApplied = true;
++    this.isRendering = true;
+     for (let i = 0; i < this._index; i++) this.members[i].translate(TabPanelDirection.START);
+     if (this.current) this.current.translate(TabPanelDirection.NONE);
+     for (let i = this._index + 1; i < this.length; i++) this.members[i].translate(TabPanelDirection.END);
+@@ -5678,6 +5711,15 @@ class TabsList extends api.core.Instance {
+   }
+ 
+   resize () {
++    // En mode react, la toute première mesure (déclenchée synchroniquement
++    // au montage par isResizing = true) ne pose pas --tabs-list-height : le
++    // HTML rendu par le serveur ne le porte pas, et rien ne le justifie
++    // avant un redimensionnement réel (fenêtre, police, orientation).
++    if (options.mode === Modes.REACT && !this._hasResized) {
++      this._hasResized = true;
++      return;
++    }
++    this._hasResized = true;
+     this.isScrolling = this.node.scrollWidth > this.node.clientWidth + SCROLL_OFFSET$1;
+     const height = this.getRect().height;
+     this.setProperty('--tabs-list-height', `${height}px`);
+@@ -6461,9 +6503,11 @@ class HeaderLinks extends api.core.Instance {
        case api.Modes.ANGULAR:
        case api.Modes.REACT:
        case api.Modes.VUE:
