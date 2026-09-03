@@ -8,7 +8,7 @@ index e4d335c..6c53dce 100644
  </svg>
 +<!-- Slightly increasing size so it reaches the threshold that will prevent it from being inlined by Vite. -->
 diff --git a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-index 0640386..91ebf68 100644
+index 0640386..b62cfcb 100644
 --- a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 +++ b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 @@ -202,6 +202,12 @@ const Modes = {
@@ -118,3 +118,15 @@ index 0640386..91ebf68 100644
          break;
  
        default:
+@@ -6513,6 +6557,11 @@ class HeaderModal extends api.core.Instance {
+   storeAria () {
+     if (this.hasAttribute('aria-labelledby')) this._ariaLabelledby = this.getAttribute('aria-labelledby');
+     if (this.hasAttribute('aria-label')) this._ariaLabel = this.getAttribute('aria-label');
++    // En mode react, ne pas retirer ces attributs : le HTML rendu par le
++    // serveur porte déjà la bonne valeur, et React l'attend telle quelle.
++    // Les valeurs restent capturées ci-dessus pour que restoreAria() reste
++    // cohérent (il ne fait alors que réaffecter la même valeur).
++    if (options.mode === Modes.REACT) return;
+     this.removeAttribute('aria-labelledby');
+     this.removeAttribute('aria-label');
+   }
