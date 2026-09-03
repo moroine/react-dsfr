@@ -268,6 +268,48 @@ reste **non résolu** par cette tâche : il est signalé pour éviter de
 prétendre à tort qu'un composant « clean » en isolation l'est forcément
 aussi combiné à 18 autres sur une même page.
 
+## 10. Relevé du 2026-09-03, après la vague de correctifs de revue finale
+
+Mesuré avec le protocole du §4 (build, `yarn install --force`, **suppression de
+`.next`**, redémarrage à froid), moteur patché, `next dev`.
+
+Une famille a été ajoutée : `accordion-expanded` — un `<Accordion
+defaultExpanded>`. Elle n'était couverte par aucune mesure antérieure alors
+qu'elle exerce un chemin distinct : react-dsfr rend le bouton avec
+`aria-expanded="true"` mais **ne rend jamais** `fr-collapse--expanded` sur le
+panneau, si bien que le moteur doit poser cette classe à l'initialisation.
+
+De plus, les deux panneaux de la famille `tab` ont maintenant des hauteurs
+délibérément très différentes : avec deux panneaux identiques, l'absence de
+`--tabs-height` était strictement invisible.
+
+| Route d'isolation | Messages | Détail |
+| --- | --- | --- |
+| `/streaming/family/accordion` | 0 | — |
+| `/streaming/family/accordion-expanded` | 2 (avertissements) | `fr-collapse--expanded` + `fr-collapsing` + `--collapse` + nœud texte. **Diverge aussi sans les correctifs** (mesuré : 2 messages, `fr-collapse--expanded` + nœud texte). Non corrigeable côté moteur : le HTML rendu par le serveur n'exprime pas l'état ouvert. |
+| `/streaming/family/tab` | 1 (avertissement) | Divergence APPARIÉE `aria-selected` / `fr-tabs__panel--selected`. **Présente à l'identique sans les correctifs** (vérifié en neutralisant les seuls hunks de `TabsGroup`) : c'est le constat C4, cause inconnue, hors périmètre de cette vague. Le HTML servi par le serveur est pourtant correct (`curl` : `aria-selected="true"` sur l'onglet 0). |
+| `/streaming/family/table` | 0 | — |
+| `/streaming/family/modal` | 0 | — |
+| `/streaming/family/header` | 0 | — |
+| `/streaming/family/navigation` | 0 | — |
+| `/streaming/family/tooltip` | 0 | — |
+| `/streaming/family/range` | 1 (avertissement) | Nœud texte ajouté par `RangeOutput.change` sur `.fr-range__output`. `suppressHydrationWarning` ne couvre pas un nœud absent de l'arbre client. **Sans l'attribut sur ce nœud, c'est un `pageerror` « Hydration failed » et le style `transform` diverge en plus** : l'attribut divise donc bien le défaut, sans l'éliminer. |
+
+Page combinée `/streaming` : toujours en échec, avec les divergences de
+`accordion-expanded`, `tab` (C4), `table` (`className=""` posé sur le `<table>`
+enfant, hors de portée du `suppressHydrationWarning` de `.fr-table`), `button`
+(`--equisized-width`, mécanisme `Equisized` non traité) et `range`.
+
+### Comportement, mesuré en navigateur réel
+
+| Mesure | Sans le correctif | Avec le correctif |
+| --- | --- | --- |
+| Hauteur de `.fr-tabs` sur `/streaming/family/tab`, avant tout clic | **684 px**, `--tabs-height` jamais posée | **156 px**, `--tabs-height: 156px` |
+| Hauteur du panneau non sélectionné | 640 px | 640 px |
+
+C'est le constat C2 : sans `--tabs-height`, le conteneur prend la hauteur du
+panneau le plus haut, tous les panneaux étant superposés dans le même flux.
+
 ## 9. Reproduire
 
 ```bash
@@ -279,7 +321,8 @@ node --stack-size=8000 node_modules/.bin/next dev -p 3100 &
 #   http://localhost:3100/no-streaming/family/<id>
 # <id> ∈ accordion, table, tab, segmented, button, range, tooltip,
 #        breadcrumb, card, checkbox, display, header, modal,
-#        navigation, password, sidemenu, tag, tile, toggle
+#        navigation, password, sidemenu, tag, tile, toggle,
+#        accordion-expanded
 ```
 
 Pour la procédure de retrait/restauration du patch, voir §4 ci-dessus (elle

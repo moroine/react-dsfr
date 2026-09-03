@@ -52,6 +52,19 @@ export const dsfrFamilies: DsfrFamily[] = [
         render: () => <Accordion label="Accordéon de test">Contenu de l&apos;accordéon.</Accordion>
     },
     {
+        id: "accordion-expanded",
+        // Accordéon ouvert par défaut : react-dsfr rend le bouton avec
+        // aria-expanded="true" mais NE rend PAS fr-collapse--expanded sur le
+        // panneau. Le moteur doit donc l'y poser à l'initialisation. Cas
+        // volontairement couvert pour mesurer ce qu'il coûte en divergence
+        // d'hydratation.
+        render: () => (
+            <Accordion label="Accordéon ouvert par défaut" defaultExpanded>
+                Contenu de l&apos;accordéon ouvert.
+            </Accordion>
+        )
+    },
+    {
         id: "table",
         render: () => (
             <Table
@@ -66,11 +79,29 @@ export const dsfrFamilies: DsfrFamily[] = [
     },
     {
         id: "tab",
+        // Les deux panneaux ont DÉLIBÉRÉMENT des hauteurs très différentes.
+        // Tous les panneaux d'un fr-tabs sont superposés dans le même flux :
+        // sans --tabs-height, le conteneur prend la hauteur du plus haut. Avec
+        // deux panneaux de même hauteur, ce défaut est strictement invisible —
+        // c'est ce qui l'avait laissé passer. Le panneau 2, non sélectionné, est
+        // donc beaucoup plus haut que le panneau 1.
         render: () => (
             <Tabs
                 tabs={[
-                    { label: "Onglet 1", content: <p>Contenu 1</p> },
-                    { label: "Onglet 2", content: <p>Contenu 2</p> }
+                    { label: "Onglet 1", content: <p>Contenu 1, une seule ligne.</p> },
+                    {
+                        label: "Onglet 2",
+                        content: (
+                            <div data-testid="tab-panel-2-content">
+                                {Array.from({ length: 12 }, (_, index) => (
+                                    <p key={index}>
+                                        Contenu 2, ligne {index + 1} — ce panneau est
+                                        volontairement beaucoup plus haut que le premier.
+                                    </p>
+                                ))}
+                            </div>
+                        )
+                    }
                 ]}
             />
         )

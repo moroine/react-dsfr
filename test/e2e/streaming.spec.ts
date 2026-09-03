@@ -113,6 +113,71 @@ test("StartDsfrOnHydration monté : toujours fonctionnel", async ({ page }) => {
     await expect(accordionButton).toHaveAttribute("aria-expanded", "true");
 });
 
+test("onglets : le conteneur prend la hauteur du panneau sélectionné", async ({ page }) => {
+    // Tous les panneaux d'un fr-tabs sont superposés dans le même flux : sans
+    // la variable --tabs-height, .fr-tabs reste en height:auto et prend la
+    // hauteur du panneau le PLUS HAUT, laissant des centaines de pixels de vide
+    // sous le panneau visible jusqu'au premier changement d'onglet. Les deux
+    // panneaux de la famille `tab` ont délibérément des hauteurs très
+    // différentes (voir app/dsfr-families.tsx) : avec deux panneaux de même
+    // hauteur, ce défaut est strictement invisible.
+    //
+    // Route d'ISOLATION, et non la page combinée : celle-ci porte une
+    // divergence d'hydratation appariée non résolue sur `tab` (voir
+    // COVERAGE.md), sans rapport avec la hauteur mesurée ici.
+    await page.goto("/streaming/family/tab");
+    await expect(page.getByTestId("dsfr-showcase")).toBeVisible({ timeout: 30_000 });
+
+    const tabsGroup = page.locator(".fr-tabs").first();
+
+    await expect
+        .poll(() => tabsGroup.evaluate(node => node.style.getPropertyValue("--tabs-height")))
+        .not.toBe("");
+
+    const tallPanelHeight = await page
+        .getByTestId("tab-panel-2-content")
+        .evaluate(node => node.scrollHeight);
+    const tabsHeight = (await tabsGroup.boundingBox())?.height ?? 0;
+
+    // Le panneau non sélectionné est bien plus haut que le conteneur : le test
+    // ne passerait pas à vide si les deux panneaux redevenaient identiques.
+    expect(tallPanelHeight).toBeGreaterThan(300);
+    expect(tabsHeight).toBeLessThan(tallPanelHeight);
+
+    // Les onglets restent pilotables.
+    const secondTab = page.locator(".fr-tabs__tab").nth(1);
+    await secondTab.click();
+    await expect(secondTab).toHaveAttribute("aria-selected", "true");
+});
+
+test("accordéon : la première ouverture est animée", async ({ page }) => {
+    // Un fr-collapse non groupé — ce que rend CHAQUE <Accordion>, react-dsfr ne
+    // rendant jamais fr-accordions-group — ne voit tourner aucun disclose() à
+    // l'initialisation. Un chemin rapide conditionné à « aucun disclose n'a
+    // encore tourné » serait donc pris au PREMIER CLIC UTILISATEUR, qui
+    // s'ouvrirait alors d'un coup, sans animation.
+    //
+    // Le chemin animé passe par Collapse.collapsing(), qui appelle adjust() et
+    // pose la variable --collapse ; le chemin rapide ne l'appelle pas. Cette
+    // variable, à la différence de la classe transitoire fr-collapsing, n'est
+    // jamais retirée ensuite : c'est une trace stable du chemin emprunté.
+    await page.goto("/streaming/family/accordion");
+    await expect(page.getByTestId("dsfr-showcase")).toBeVisible({ timeout: 30_000 });
+
+    const accordionButton = page.locator(".fr-accordion__btn").first();
+    const accordionPanel = page.locator(".fr-accordion .fr-collapse").first();
+    const getCollapseProperty = () =>
+        accordionPanel.evaluate(node => node.style.getPropertyValue("--collapse"));
+
+    // Avant le clic : la synchronisation initiale n'a rien posé de transitoire.
+    expect(await getCollapseProperty()).toBe("");
+
+    await accordionButton.click();
+
+    await expect.poll(getCollapseProperty).not.toBe("");
+    await expect(accordionButton).toHaveAttribute("aria-expanded", "true");
+});
+
 test("sans streaming : aucune divergence d'hydratation", async ({ page }) => {
     const hydrationMessages: string[] = [];
     const pageErrors: string[] = [];
