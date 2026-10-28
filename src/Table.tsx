@@ -1,4 +1,4 @@
-import React, { forwardRef, memo, type ReactNode, type CSSProperties } from "react";
+import React, { forwardRef, useId, memo, type ReactNode, type CSSProperties } from "react";
 import { assert } from "tsafe/assert";
 import type { Equals } from "tsafe";
 import { fr } from "./fr";
@@ -6,7 +6,7 @@ import { cx } from "./tools/cx";
 import { symToStr } from "tsafe/symToStr";
 import type { FrClassName } from "./fr/generatedFromCss/classNames";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 
 export type TableProps = {
     id?: string;
@@ -65,12 +65,12 @@ export const Table = memo(
             "explicitlyProvidedId": id_props
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         return (
             <div
                 id={id}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
                 style={style}
                 className={cx(
@@ -111,6 +111,7 @@ export const Table = memo(
                         ))}
                     </tbody>
                 </table>
+                <HydrationRelease id={hydrationId} />
             </div>
         );
     })

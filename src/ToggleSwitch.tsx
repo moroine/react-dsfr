@@ -1,4 +1,12 @@
-import React, { memo, forwardRef, ReactNode, useState, useEffect, type CSSProperties } from "react";
+import React, {
+    memo,
+    forwardRef,
+    useId,
+    ReactNode,
+    useState,
+    useEffect,
+    type CSSProperties
+} from "react";
 import { symToStr } from "tsafe/symToStr";
 import { assert } from "tsafe/assert";
 import type { Equals } from "tsafe";
@@ -7,7 +15,7 @@ import { fr } from "./fr";
 import { createComponentI18nApi } from "./i18n";
 import { useConstCallback } from "./tools/powerhooks/useConstCallback";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 
 export type ToggleSwitchProps = ToggleSwitchProps.Controlled | ToggleSwitchProps.Uncontrolled;
 
@@ -70,7 +78,7 @@ export const ToggleSwitch = memo(
             "explicitlyProvidedId": id_props
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const inputId = `${id}-input`;
 
@@ -109,7 +117,7 @@ export const ToggleSwitch = memo(
                     classes.root,
                     className
                 )}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
                 style={style}
             >
@@ -139,6 +147,7 @@ export const ToggleSwitch = memo(
                         {helperText}
                     </p>
                 )}
+                <HydrationRelease id={hydrationId} />
             </div>
         );
     })

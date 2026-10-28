@@ -62,9 +62,9 @@ export function DsfrProviderBase(
 
     // Children effects run before their parent's: when this one fires, the
     // shell is hydrated. Content streamed in later is not hydrated yet, but
-    // react-dsfr components mark their root with data-fr-hydrating until they
-    // are (see useHydrationGate), and the DSFR engine leaves such subtrees
-    // alone. This is what makes <StartDsfrOnHydration /> optional.
+    // react-dsfr components mark their root with data-fr-hydrating, which the
+    // DSFR engine leaves alone until they release it once hydrated (see
+    // HydrationRelease). This is what makes <StartDsfrOnHydration /> optional.
     useEffect(() => {
         dsfrEffect();
     }, []);

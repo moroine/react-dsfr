@@ -3,6 +3,7 @@ import type { JSX } from "../tools/JSX";
 import React, {
     memo,
     forwardRef,
+    useId,
     cloneElement,
     type ReactNode,
     type CSSProperties,
@@ -24,7 +25,7 @@ import { setBrandTopAndHomeLinkProps } from "../zz_internal/brandTopAndHomeLinkP
 import { typeGuard } from "tsafe/typeGuard";
 import { SearchButton } from "../SearchBar/SearchButton";
 import { useTranslation as useSearchBarTranslation } from "../SearchBar/SearchBar";
-import { useHydrationGate } from "../tools/useHydrationGate";
+import { HydrationRelease } from "../tools/HydrationRelease";
 
 export type HeaderProps = {
     className?: string;
@@ -159,7 +160,7 @@ export const Header = memo(
         const { t } = useTranslation();
         const { t: tSearchBar } = useSearchBarTranslation();
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const { Link } = getLink();
 
@@ -207,7 +208,7 @@ export const Header = memo(
                     role="banner"
                     id={id}
                     className={cx(fr.cx("fr-header"), classes.root, className)}
-                    {...hydrationGate}
+                    data-fr-hydrating={hydrationId}
                     ref={ref}
                     style={style}
                     {...rest}
@@ -475,6 +476,7 @@ export const Header = memo(
                             </div>
                         </div>
                     )}
+                    <HydrationRelease id={hydrationId} />
                 </header>
             </>
         );

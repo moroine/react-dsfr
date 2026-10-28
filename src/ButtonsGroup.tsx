@@ -1,4 +1,4 @@
-import React, { memo, forwardRef, type CSSProperties } from "react";
+import React, { memo, forwardRef, useId, type CSSProperties } from "react";
 import { Button } from "./Button";
 import { ButtonProps } from "./Button";
 import { symToStr } from "tsafe/symToStr";
@@ -7,7 +7,7 @@ import type { Equals } from "tsafe";
 import { fr } from "./fr";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 
 export type ButtonsGroupProps = ButtonsGroupProps.AlwaysStacked | ButtonsGroupProps.Inline;
 
@@ -72,7 +72,7 @@ export const ButtonsGroup = memo(
             "explicitlyProvidedId": props_id
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const buttonsGroupClassName = cx(
             fr.cx(
@@ -112,7 +112,7 @@ export const ButtonsGroup = memo(
                 id={id}
                 className={buttonsGroupClassName}
                 style={style}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
                 {...rest}
             >
@@ -121,6 +121,7 @@ export const ButtonsGroup = memo(
                         <Button {...buttonProps} />
                     </li>
                 ))}
+                <HydrationRelease id={hydrationId} />
             </ul>
         );
     })

@@ -12,7 +12,7 @@ import React from "react";
 import { type CxArg } from "tss-react";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 
 export type SegmentedControlProps = {
     id?: string;
@@ -112,7 +112,7 @@ export const SegmentedControl = memo(
             "explicitlyProvidedId": props_id
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const getInputId = (i: number) => `${id}-${i}`;
 
@@ -134,7 +134,7 @@ export const SegmentedControl = memo(
                     classes.root,
                     className
                 )}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
                 style={style}
                 {...rest}
@@ -194,6 +194,7 @@ export const SegmentedControl = memo(
                         );
                     })}
                 </div>
+                <HydrationRelease id={hydrationId} />
             </fieldset>
         );
     })

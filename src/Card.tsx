@@ -1,6 +1,7 @@
 import React, {
     memo,
     forwardRef,
+    useId,
     type ReactNode,
     type CSSProperties,
     type DetailedHTMLProps,
@@ -14,7 +15,7 @@ import type { RegisteredLinkProps } from "./link";
 import { getLink } from "./link";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 import { assert, type Equals } from "tsafe/assert";
 
 //https://main--ds-gouv.netlify.app/example/component/card/
@@ -157,7 +158,7 @@ export const Card = memo(
             "explicitlyProvidedId": props_id
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const { Link } = getLink();
 
@@ -193,7 +194,7 @@ export const Card = memo(
                     className
                 )}
                 style={style}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
                 {...rest}
             >
@@ -269,6 +270,7 @@ export const Card = memo(
                         )}
                     </div>
                 )}
+                <HydrationRelease id={hydrationId} />
             </div>
         );
     })

@@ -12,7 +12,7 @@ import type { Equals } from "tsafe";
 import { cx } from "../tools/cx";
 import { fr } from "../fr";
 import { useAnalyticsId } from "../tools/useAnalyticsId";
-import { useHydrationGate } from "../tools/useHydrationGate";
+import { HydrationRelease } from "../tools/HydrationRelease";
 
 export type FieldsetProps = FieldsetProps.Radio | FieldsetProps.Checkbox;
 
@@ -93,7 +93,7 @@ export const Fieldset = memo(
             "explicitlyProvidedId": id_props
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const getInputId = (i: number) => `${id}-${i}`;
 
@@ -132,7 +132,7 @@ export const Fieldset = memo(
                         isRoot ? className : undefined,
                         classes.inputGroup
                     )}
-                    {...(isRoot ? hydrationGate : {})}
+                    data-fr-hydrating={isRoot ? hydrationId : undefined}
                     key={i}
                 >
                     <input type={type} id={inputId} name={radioName} {...nativeInputProps} />
@@ -145,6 +145,7 @@ export const Fieldset = memo(
                     {"illustration" in rest && (
                         <div className={fr.cx("fr-radio-rich__img")}>{rest.illustration}</div>
                     )}
+                    {isRoot && <HydrationRelease id={hydrationId} />}
                 </div>
             );
         };
@@ -191,7 +192,7 @@ export const Fieldset = memo(
                 aria-labelledby={cx(legend !== undefined && legendId, messagesWrapperId)}
                 role={state === "default" ? undefined : "group"}
                 {...rest}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
             >
                 {legend !== undefined && (
@@ -238,6 +239,7 @@ export const Fieldset = memo(
                         </p>
                     )}
                 </div>
+                <HydrationRelease id={hydrationId} />
             </fieldset>
         );
     })

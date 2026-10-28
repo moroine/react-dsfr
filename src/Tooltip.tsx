@@ -1,10 +1,10 @@
-import React, { forwardRef, memo } from "react";
+import React, { forwardRef, useId, memo } from "react";
 import type { ReactNode, CSSProperties } from "react";
 import type { Equals } from "tsafe";
 import { assert } from "tsafe/assert";
 import { symToStr } from "tsafe/symToStr";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 import { createComponentI18nApi } from "./i18n";
 import { fr } from "./fr";
 import { cx } from "./tools/cx";
@@ -43,7 +43,7 @@ export const Tooltip = memo(
             "explicitlyProvidedId": id_prop
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         return (
             <>
@@ -72,12 +72,13 @@ export const Tooltip = memo(
                 <span
                     className={cx(fr.cx("fr-tooltip", "fr-placement"), className)}
                     id={id}
-                    {...hydrationGate}
+                    data-fr-hydrating={hydrationId}
                     ref={ref}
                     style={style}
                     role="tooltip"
                 >
                     {title}
+                    <HydrationRelease id={hydrationId} />
                 </span>
             </>
         );

@@ -2,6 +2,7 @@
 
 import React, {
     forwardRef,
+    useId,
     memo,
     useState,
     useEffect,
@@ -15,7 +16,7 @@ import { cx } from "./tools/cx";
 import { symToStr } from "tsafe/symToStr";
 import { useConstCallback } from "./tools/powerhooks/useConstCallback";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 
 export type AccordionProps = AccordionProps.Controlled | AccordionProps.Uncontrolled;
 
@@ -73,7 +74,7 @@ export const Accordion = memo(
             "explicitlyProvidedId": id_props
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const collapseElementId = `${id}-collapse`;
 
@@ -103,7 +104,7 @@ export const Accordion = memo(
             <section
                 className={cx(fr.cx("fr-accordion"), className)}
                 style={style}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
                 {...rest}
             >
@@ -122,6 +123,7 @@ export const Accordion = memo(
                 <div className={cx(fr.cx("fr-collapse"), classes.collapse)} id={collapseElementId}>
                     {children}
                 </div>
+                <HydrationRelease id={hydrationId} />
             </section>
         );
     })

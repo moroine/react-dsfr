@@ -8,7 +8,7 @@ import { createComponentI18nApi } from "./i18n";
 import { fr } from "./fr";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
-import { useHydrationGate } from "./tools/useHydrationGate";
+import { HydrationRelease } from "./tools/HydrationRelease";
 
 export type BreadcrumbProps = {
     id?: string;
@@ -44,7 +44,7 @@ export const Breadcrumb = memo(
             "explicitlyProvidedId": props_id
         });
 
-        const hydrationGate = useHydrationGate();
+        const hydrationId = useId();
 
         const { t } = useTranslation();
 
@@ -54,7 +54,7 @@ export const Breadcrumb = memo(
         return (
             <nav
                 id={id}
-                {...hydrationGate}
+                data-fr-hydrating={hydrationId}
                 ref={ref}
                 role="navigation"
                 className={cx(fr.cx("fr-breadcrumb"), classes.root, className)}
@@ -99,6 +99,7 @@ export const Breadcrumb = memo(
                         </>
                     </ol>
                 </div>
+                <HydrationRelease id={hydrationId} />
             </nav>
         );
     })
