@@ -27,8 +27,12 @@ const accordionMarkup = (id: string) => `
 </section>
 `;
 
-async function loadEngine(params: { markup: string }) {
-    const { markup } = params;
+async function loadEngine(params: {
+    markup: string;
+    /** Called once the markup is in place, before the engine starts. */
+    beforeStart?: (dsfr: any) => void;
+}) {
+    const { markup, beforeStart } = params;
 
     const dom = new JSDOM(`<!doctype html><html><head></head><body></body></html>`, {
         pretendToBeVisual: true,
@@ -62,10 +66,11 @@ async function loadEngine(params: { markup: string }) {
     (window as any).eval(fs.readFileSync(ENGINE_PATH, "utf8"));
 
     window.document.body.innerHTML = markup;
+    beforeStart?.((window as any).dsfr);
     (window as any).dsfr.start();
     await nextFrames();
 
-    return { window };
+    return { window, dsfr: (window as any).dsfr };
 }
 
 // Mutations are replayed by the engine on the next animation frame.
@@ -159,6 +164,129 @@ describe("@gouvfr/dsfr engine, data-fr-hydrating gate", () => {
         expect(isInstrumented(window, "inner-acc")).toBe(false);
 
         window.document.getElementById("inner")!.removeAttribute("data-fr-hydrating");
+        await nextFrames();
+
+        expect(isInstrumented(window, "inner-acc")).toBe(true);
+
+        window.close();
+    });
+});
+
+describe("@gouvfr/dsfr engine, dsfr.hydrated(id)", () => {
+    it("keeps a gate carrying an id closed until it is released", async () => {
+        const { window, dsfr } = await loadEngine({
+            markup: `<div data-fr-hydrating="g1">${accordionMarkup("acc")}</div>`
+        });
+
+        expect(isInstrumented(window, "acc")).toBe(false);
+
+        dsfr.hydrated("g1");
+        await nextFrames();
+
+        expect(isInstrumented(window, "acc")).toBe(true);
+
+        window.close();
+    });
+
+    it("leaves the gate attribute in the DOM", async () => {
+        const { window, dsfr } = await loadEngine({
+            markup: `<div id="gate" data-fr-hydrating="g1">${accordionMarkup("acc")}</div>`
+        });
+
+        dsfr.hydrated("g1");
+        await nextFrames();
+
+        expect(window.document.getElementById("gate")!.getAttribute("data-fr-hydrating")).toBe(
+            "g1"
+        );
+
+        window.close();
+    });
+
+    it("only releases the gate carrying that id", async () => {
+        const { window, dsfr } = await loadEngine({
+            markup: `
+                <div data-fr-hydrating="g1">${accordionMarkup("acc-1")}</div>
+                <div data-fr-hydrating="g2">${accordionMarkup("acc-2")}</div>
+            `
+        });
+
+        dsfr.hydrated("g1");
+        await nextFrames();
+
+        expect(isInstrumented(window, "acc-1")).toBe(true);
+        expect(isInstrumented(window, "acc-2")).toBe(false);
+
+        window.close();
+    });
+
+    it("applies a release made before the engine starts", async () => {
+        const { window } = await loadEngine({
+            markup: `<div data-fr-hydrating="g1">${accordionMarkup("acc")}</div>`,
+            beforeStart: dsfr => dsfr.hydrated("g1")
+        });
+
+        expect(isInstrumented(window, "acc")).toBe(true);
+
+        window.close();
+    });
+
+    it("instruments nodes added later under a released gate", async () => {
+        const { window, dsfr } = await loadEngine({
+            markup: `<div id="gate" data-fr-hydrating="g1"></div>`
+        });
+
+        dsfr.hydrated("g1");
+
+        const added = window.document.createElement("div");
+        added.innerHTML = accordionMarkup("acc");
+        window.document.getElementById("gate")!.appendChild(added);
+        await nextFrames();
+
+        expect(isInstrumented(window, "acc")).toBe(true);
+
+        window.close();
+    });
+
+    it("keeps a nested gate closed until its own release", async () => {
+        const { window, dsfr } = await loadEngine({
+            markup: `
+                <div data-fr-hydrating="outer">
+                    ${accordionMarkup("outer-acc")}
+                    <div data-fr-hydrating="inner">${accordionMarkup("inner-acc")}</div>
+                </div>
+            `
+        });
+
+        dsfr.hydrated("outer");
+        await nextFrames();
+
+        expect(isInstrumented(window, "outer-acc")).toBe(true);
+        expect(isInstrumented(window, "inner-acc")).toBe(false);
+
+        dsfr.hydrated("inner");
+        await nextFrames();
+
+        expect(isInstrumented(window, "inner-acc")).toBe(true);
+
+        window.close();
+    });
+
+    it("keeps an inner gate closed while its enclosing gate is not released", async () => {
+        const { window, dsfr } = await loadEngine({
+            markup: `
+                <div data-fr-hydrating="outer">
+                    <div data-fr-hydrating="inner">${accordionMarkup("inner-acc")}</div>
+                </div>
+            `
+        });
+
+        dsfr.hydrated("inner");
+        await nextFrames();
+
+        expect(isInstrumented(window, "inner-acc")).toBe(false);
+
+        dsfr.hydrated("outer");
         await nextFrames();
 
         expect(isInstrumented(window, "inner-acc")).toBe(true);
