@@ -18,8 +18,8 @@ function isHydrationMessage(text: string): boolean {
 }
 
 // /streaming rend les familles comme Server Components, /streaming-client
-// comme Client Components. Seuls ces derniers peuvent poser la porte
-// data-fr-hydrating : un Server Component n'a aucun effet client pour la lever.
+// comme Client Components. Dans les deux cas, chaque composant pose sa porte
+// data-fr-hydrating et la lève une fois hydraté (HydrationRelease).
 for (const path of ["/streaming", "/streaming-client"]) {
     test(`${path} : aucune divergence d'hydratation, moteur fonctionnel`, async ({ page }) => {
         await expectStreamedShowcaseToWork(page, path);
@@ -58,13 +58,7 @@ async function expectStreamedShowcaseToWork(page: Page, path: string) {
     expect(hydrationMessages).toEqual([]);
     expect(pageErrors).toEqual([]);
 
-    // La modale de la famille `modal` est ouverte par défaut
-    // (isOpenedByDefault) et intercepte les clics sur le reste de la page.
-    // Le moteur l'ouvre, puis la ferme sur Échap.
-    const modal = page.locator("#showcase-test-modal");
-    await expect(modal).toHaveClass(/fr-modal--opened/);
-    await page.keyboard.press("Escape");
-    await expect(modal).not.toHaveClass(/fr-modal--opened/);
+    await closeModalOpenedByDefault(page);
 
     // Le moteur pilote bien le contenu arrivé tardivement.
     const accordionButton = page.locator(".fr-accordion__btn").first();
@@ -95,6 +89,16 @@ async function expectStreamedShowcaseToWork(page: Page, path: string) {
     await expect(rangeOutput).toHaveText("80");
 }
 
+// La modale de la famille `modal` est ouverte par défaut (isOpenedByDefault)
+// et intercepte les clics sur le reste de la page. Le moteur l'ouvre, puis la
+// ferme sur Échap.
+async function closeModalOpenedByDefault(page: Page) {
+    const modal = page.locator("#showcase-test-modal");
+    await expect(modal).toHaveClass(/fr-modal--opened/);
+    await page.keyboard.press("Escape");
+    await expect(modal).not.toHaveClass(/fr-modal--opened/);
+}
+
 test("StartDsfrOnHydration monté : toujours fonctionnel", async ({ page }) => {
     const hydrationMessages: string[] = [];
     // Le message React « Hydration failed... » n'est jamais émis via
@@ -120,6 +124,8 @@ test("StartDsfrOnHydration monté : toujours fonctionnel", async ({ page }) => {
 
     expect(hydrationMessages).toEqual([]);
     expect(pageErrors).toEqual([]);
+
+    await closeModalOpenedByDefault(page);
 
     // dsfrEffect() est idempotent : le monter en plus de DsfrProvider ne doit
     // rien casser. C'est le critère d'acceptation n°4 de la spec.

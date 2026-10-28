@@ -4,9 +4,8 @@ import { DsfrShowcase } from "./DsfrShowcase";
 import { getDsfrFamily } from "./dsfr-families";
 
 // Mêmes familles que DsfrShowcase, rendues cette fois comme Client
-// Components. C'est le seul cas où les composants react-dsfr peuvent poser la
-// porte data-fr-hydrating : rendus comme Server Components, ils n'ont aucun
-// effet client pour la lever, et useHydrationGate n'en pose donc aucune.
+// Components : les deux chemins par lesquels un composant react-dsfr pose et
+// lève sa porte data-fr-hydrating doivent fonctionner.
 export function ClientShowcase(props: { familyId?: string }) {
     const { familyId } = props;
 
