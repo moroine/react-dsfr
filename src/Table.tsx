@@ -6,6 +6,7 @@ import { cx } from "./tools/cx";
 import { symToStr } from "tsafe/symToStr";
 import type { FrClassName } from "./fr/generatedFromCss/classNames";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 export type TableProps = {
     id?: string;
@@ -64,9 +65,12 @@ export const Table = memo(
             "explicitlyProvidedId": id_props
         });
 
+        const hydrationGate = useHydrationGate();
+
         return (
             <div
                 id={id}
+                {...hydrationGate}
                 ref={ref}
                 style={style}
                 className={cx(

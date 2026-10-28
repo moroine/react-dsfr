@@ -17,6 +17,7 @@ import { assert } from "tsafe/assert";
 import type { Equals } from "tsafe";
 import { symToStr } from "tsafe/symToStr";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 export type ButtonProps = ButtonProps.Common &
     (ButtonProps.IconOnly | ButtonProps.WithIcon | ButtonProps.WithoutIcon) &
@@ -106,6 +107,8 @@ export const Button = memo(
             "explicitlyProvidedId": props_id
         });
 
+        const hydrationGate = useHydrationGate();
+
         const { Link } = getLink();
 
         const className = cx(
@@ -142,6 +145,7 @@ export const Button = memo(
                     ...linkProps?.style,
                     ...style
                 }}
+                {...hydrationGate}
                 ref={ref as React.ForwardedRef<HTMLAnchorElement>}
                 {...rest}
             >
@@ -160,6 +164,7 @@ export const Button = memo(
                 title={title ?? nativeButtonProps?.title}
                 onClick={onClick ?? nativeButtonProps?.onClick}
                 disabled={disabled ?? nativeButtonProps?.disabled}
+                {...hydrationGate}
                 ref={ref as React.ForwardedRef<HTMLButtonElement>}
                 value={value}
                 {...rest}

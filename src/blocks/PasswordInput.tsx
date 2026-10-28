@@ -18,6 +18,7 @@ import type { InputProps } from "../Input";
 import { cx } from "../tools/cx";
 import type { FrClassName } from "../fr/generatedFromCss/classNames";
 import { useAnalyticsId } from "../tools/useAnalyticsId";
+import { useHydrationGate } from "../tools/useHydrationGate";
 
 export type PasswordInputProps = Omit<
     InputProps.Common,
@@ -71,6 +72,8 @@ export const PasswordInput = memo(
             "explicitlyProvidedId": id_props,
             "defaultIdPrefix": "password-input"
         });
+
+        const hydrationGate = useHydrationGate();
 
         const inputId = (function useClosure() {
             const id = useId();
@@ -133,6 +136,7 @@ export const PasswordInput = memo(
                 )}
                 id={id}
                 style={style}
+                {...hydrationGate}
                 ref={ref}
                 {...rest}
             >

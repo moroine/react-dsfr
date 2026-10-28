@@ -24,6 +24,7 @@ import { setBrandTopAndHomeLinkProps } from "../zz_internal/brandTopAndHomeLinkP
 import { typeGuard } from "tsafe/typeGuard";
 import { SearchButton } from "../SearchBar/SearchButton";
 import { useTranslation as useSearchBarTranslation } from "../SearchBar/SearchBar";
+import { useHydrationGate } from "../tools/useHydrationGate";
 
 export type HeaderProps = {
     className?: string;
@@ -158,6 +159,8 @@ export const Header = memo(
         const { t } = useTranslation();
         const { t: tSearchBar } = useSearchBarTranslation();
 
+        const hydrationGate = useHydrationGate();
+
         const { Link } = getLink();
 
         const getQuickAccessNode = (usecase: "mobile" | "desktop") => (
@@ -204,6 +207,7 @@ export const Header = memo(
                     role="banner"
                     id={id}
                     className={cx(fr.cx("fr-header"), classes.root, className)}
+                    {...hydrationGate}
                     ref={ref}
                     style={style}
                     {...rest}

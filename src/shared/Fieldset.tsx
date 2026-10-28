@@ -12,6 +12,7 @@ import type { Equals } from "tsafe";
 import { cx } from "../tools/cx";
 import { fr } from "../fr";
 import { useAnalyticsId } from "../tools/useAnalyticsId";
+import { useHydrationGate } from "../tools/useHydrationGate";
 
 export type FieldsetProps = FieldsetProps.Radio | FieldsetProps.Checkbox;
 
@@ -92,6 +93,8 @@ export const Fieldset = memo(
             "explicitlyProvidedId": id_props
         });
 
+        const hydrationGate = useHydrationGate();
+
         const getInputId = (i: number) => `${id}-${i}`;
 
         const legendId = `${id}-legend`;
@@ -129,6 +132,7 @@ export const Fieldset = memo(
                         isRoot ? className : undefined,
                         classes.inputGroup
                     )}
+                    {...(isRoot ? hydrationGate : {})}
                     key={i}
                 >
                     <input type={type} id={inputId} name={radioName} {...nativeInputProps} />
@@ -187,6 +191,7 @@ export const Fieldset = memo(
                 aria-labelledby={cx(legend !== undefined && legendId, messagesWrapperId)}
                 role={state === "default" ? undefined : "group"}
                 {...rest}
+                {...hydrationGate}
                 ref={ref}
             >
                 {legend !== undefined && (

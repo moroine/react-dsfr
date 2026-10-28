@@ -8,6 +8,7 @@ import { fr } from "./fr";
 import { getLink, type RegisteredLinkProps } from "./link";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 //https://main--ds-gouv.netlify.app/example/component/tile/
 export type TileProps = {
@@ -136,6 +137,8 @@ export const Tile = memo(
             "explicitlyProvidedId": id_props
         });
 
+        const hydrationGate = useHydrationGate();
+
         return (
             <div
                 id={id}
@@ -159,6 +162,7 @@ export const Tile = memo(
                     classes.root,
                     className
                 )}
+                {...hydrationGate}
                 ref={ref}
                 style={style}
                 {...rest}

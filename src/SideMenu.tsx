@@ -7,6 +7,7 @@ import { getLink } from "./link";
 import { fr } from "./fr";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 //https://main--ds-gouv.netlify.app/example/component/sidemenu/
 export type SideMenuProps = {
@@ -75,6 +76,8 @@ export const SideMenu = memo(
             "explicitlyProvidedId": id_props
         });
 
+        const hydrationGate = useHydrationGate();
+
         const collapseId = `${id}-collapse`;
 
         const titleId = `${id}-title`;
@@ -89,6 +92,7 @@ export const SideMenu = memo(
             <nav
                 id={id}
                 {...rest}
+                {...hydrationGate}
                 ref={ref}
                 style={style}
                 {...(title !== undefined && { "aria-labelledby": titleId })}

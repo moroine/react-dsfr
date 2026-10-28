@@ -4,6 +4,7 @@ import type { Equals } from "tsafe";
 import { assert } from "tsafe/assert";
 import { symToStr } from "tsafe/symToStr";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 import { createComponentI18nApi } from "./i18n";
 import { fr } from "./fr";
 import { cx } from "./tools/cx";
@@ -42,6 +43,8 @@ export const Tooltip = memo(
             "explicitlyProvidedId": id_prop
         });
 
+        const hydrationGate = useHydrationGate();
+
         return (
             <>
                 {kind === "click" ? (
@@ -69,6 +72,7 @@ export const Tooltip = memo(
                 <span
                     className={cx(fr.cx("fr-tooltip", "fr-placement"), className)}
                     id={id}
+                    {...hydrationGate}
                     ref={ref}
                     style={style}
                     role="tooltip"

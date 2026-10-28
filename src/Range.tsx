@@ -13,6 +13,7 @@ import { type CxArg } from "tss-react";
 import { fr } from "./fr";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 export type RangeProps = {
     id?: string;
@@ -106,6 +107,8 @@ export const Range = memo(
             "explicitlyProvidedId": props_id
         });
 
+        const hydrationGate = useHydrationGate();
+
         const labelId = `${id}-label`;
 
         const errorMessageId = `${id}-message-error`;
@@ -125,6 +128,7 @@ export const Range = memo(
                     className
                 )}
                 style={style}
+                {...hydrationGate}
                 ref={ref}
                 id={`${id}-group`}
                 {...rest}

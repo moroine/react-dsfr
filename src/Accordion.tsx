@@ -15,6 +15,7 @@ import { cx } from "./tools/cx";
 import { symToStr } from "tsafe/symToStr";
 import { useConstCallback } from "./tools/powerhooks/useConstCallback";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 export type AccordionProps = AccordionProps.Controlled | AccordionProps.Uncontrolled;
 
@@ -72,6 +73,8 @@ export const Accordion = memo(
             "explicitlyProvidedId": id_props
         });
 
+        const hydrationGate = useHydrationGate();
+
         const collapseElementId = `${id}-collapse`;
 
         const [isExpanded, setIsExpanded] = useState(expanded_props ?? defaultExpanded);
@@ -100,6 +103,7 @@ export const Accordion = memo(
             <section
                 className={cx(fr.cx("fr-accordion"), className)}
                 style={style}
+                {...hydrationGate}
                 ref={ref}
                 {...rest}
             >

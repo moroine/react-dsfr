@@ -12,6 +12,7 @@ import { Menu } from "./Menu";
 import type { MegaMenuProps } from "./MegaMenu";
 import { MegaMenu } from "./MegaMenu";
 import { useAnalyticsId } from "../tools/useAnalyticsId";
+import { useHydrationGate } from "../tools/useHydrationGate";
 
 export type MainNavigationProps = {
     className?: string;
@@ -89,6 +90,8 @@ export const MainNavigation = memo(
             "defaultIdPrefix": "main-navigation"
         });
 
+        const hydrationGate = useHydrationGate();
+
         const getMenuId = (i: number) => `${id}-menu-${i}`;
 
         return (
@@ -98,6 +101,7 @@ export const MainNavigation = memo(
                 style={style}
                 role="navigation"
                 aria-label={t("main menu")}
+                {...hydrationGate}
                 ref={ref}
                 {...rest}
             >

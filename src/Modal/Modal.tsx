@@ -9,6 +9,7 @@ import { createComponentI18nApi } from "../i18n";
 import type { FrIconClassName, RiIconClassName } from "../fr/generatedFromCss/classNames";
 import Button, { ButtonProps } from "../Button";
 import { overwriteReadonlyProp } from "tsafe/lab/overwriteReadonlyProp";
+import { useHydrationGate } from "../tools/useHydrationGate";
 
 export type ModalProps = {
     className?: string;
@@ -66,6 +67,7 @@ const Modal = memo(
                 : [buttons_props];
 
         const { t } = useTranslation();
+        const hydrationGate = useHydrationGate();
         const titleId = `fr-modal-title-${id}`;
         return (
             <dialog
@@ -73,6 +75,7 @@ const Modal = memo(
                 id={id}
                 className={cx(fr.cx("fr-modal", topAnchor && "fr-modal--top"), className)}
                 style={style}
+                {...hydrationGate}
                 ref={ref}
                 data-fr-concealing-backdrop={concealingBackdrop}
             >

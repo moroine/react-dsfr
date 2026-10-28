@@ -7,6 +7,7 @@ import { fr } from "./fr";
 import { createComponentI18nApi } from "./i18n";
 import { useConstCallback } from "./tools/powerhooks/useConstCallback";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 export type ToggleSwitchProps = ToggleSwitchProps.Controlled | ToggleSwitchProps.Uncontrolled;
 
@@ -69,6 +70,8 @@ export const ToggleSwitch = memo(
             "explicitlyProvidedId": id_props
         });
 
+        const hydrationGate = useHydrationGate();
+
         const inputId = `${id}-input`;
 
         const hintId = `${id}-hint-text`;
@@ -106,6 +109,7 @@ export const ToggleSwitch = memo(
                     classes.root,
                     className
                 )}
+                {...hydrationGate}
                 ref={ref}
                 style={style}
             >

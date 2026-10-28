@@ -7,6 +7,7 @@ import type { Equals } from "tsafe";
 import { fr } from "./fr";
 import { cx } from "./tools/cx";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 export type ButtonsGroupProps = ButtonsGroupProps.AlwaysStacked | ButtonsGroupProps.Inline;
 
@@ -71,6 +72,8 @@ export const ButtonsGroup = memo(
             "explicitlyProvidedId": props_id
         });
 
+        const hydrationGate = useHydrationGate();
+
         const buttonsGroupClassName = cx(
             fr.cx(
                 "fr-btns-group",
@@ -105,7 +108,14 @@ export const ButtonsGroup = memo(
         );
 
         return (
-            <ul id={id} className={buttonsGroupClassName} style={style} ref={ref} {...rest}>
+            <ul
+                id={id}
+                className={buttonsGroupClassName}
+                style={style}
+                {...hydrationGate}
+                ref={ref}
+                {...rest}
+            >
                 {buttons.map((buttonProps, i) => (
                     <li key={i}>
                         <Button {...buttonProps} />

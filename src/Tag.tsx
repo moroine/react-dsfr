@@ -17,6 +17,7 @@ import { assert } from "tsafe/assert";
 import type { Equals } from "tsafe";
 import { symToStr } from "tsafe/symToStr";
 import { useAnalyticsId } from "./tools/useAnalyticsId";
+import { useHydrationGate } from "./tools/useHydrationGate";
 
 type DataAttribute = Record<`data-${string}`, string | boolean | null | undefined>;
 
@@ -127,6 +128,8 @@ export const Tag = memo(
                 "explicitlyProvidedId": id_props
             });
 
+            const hydrationGate = useHydrationGate();
+
             const { Link } = getLink();
 
             const className = cx(
@@ -156,6 +159,7 @@ export const Tag = memo(
                                 ...linkProps?.style,
                                 ...style
                             }}
+                            {...hydrationGate}
                             ref={ref as React.ForwardedRef<HTMLAnchorElement>}
                             {...rest}
                         >
@@ -174,6 +178,7 @@ export const Tag = memo(
                             title={title ?? nativeButtonProps?.title}
                             onClick={onClick ?? nativeButtonProps?.onClick}
                             disabled={nativeButtonProps?.disabled}
+                            {...hydrationGate}
                             ref={ref as React.ForwardedRef<HTMLButtonElement>}
                             aria-pressed={pressed}
                             {...rest}
@@ -193,6 +198,7 @@ export const Tag = memo(
                                     ...style
                                 }}
                                 title={title ?? nativeParagraphOrSpanProps?.title}
+                                {...hydrationGate}
                                 ref={ref as React.ForwardedRef<HTMLParagraphElement>}
                                 {...rest}
                             >
