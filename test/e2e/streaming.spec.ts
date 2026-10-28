@@ -1,4 +1,4 @@
-import { test, expect, type ConsoleMessage } from "@playwright/test";
+import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
 
 // React 19 a reformulé le message : il dit « didn't match », pas
 // « did not match ». Un motif qui ne couvrirait que l'ancienne formulation
@@ -17,7 +17,16 @@ function isHydrationMessage(text: string): boolean {
     return HYDRATION_PATTERNS.some(pattern => text.includes(pattern));
 }
 
-test("streaming : aucune divergence d'hydratation, moteur fonctionnel", async ({ page }) => {
+// /streaming rend les familles comme Server Components, /streaming-client
+// comme Client Components. Seuls ces derniers peuvent poser la porte
+// data-fr-hydrating : un Server Component n'a aucun effet client pour la lever.
+for (const path of ["/streaming", "/streaming-client"]) {
+    test(`${path} : aucune divergence d'hydratation, moteur fonctionnel`, async ({ page }) => {
+        await expectStreamedShowcaseToWork(page, path);
+    });
+}
+
+async function expectStreamedShowcaseToWork(page: Page, path: string) {
     const hydrationMessages: string[] = [];
     const pageErrors: string[] = [];
 
@@ -37,7 +46,7 @@ test("streaming : aucune divergence d'hydratation, moteur fonctionnel", async ({
     // ici. "commit" rend la main dès que les en-têtes arrivent, et laisse
     // les assertions Playwright ci-dessous attendre chaque état par
     // auto-retry.
-    await page.goto("/streaming", { waitUntil: "commit" });
+    await page.goto(path, { waitUntil: "commit" });
 
     // Le shell arrive avant le contenu streamé.
     await expect(page.getByTestId("shell")).toBeVisible();
@@ -48,6 +57,14 @@ test("streaming : aucune divergence d'hydratation, moteur fonctionnel", async ({
 
     expect(hydrationMessages).toEqual([]);
     expect(pageErrors).toEqual([]);
+
+    // La modale de la famille `modal` est ouverte par défaut
+    // (isOpenedByDefault) et intercepte les clics sur le reste de la page.
+    // Le moteur l'ouvre, puis la ferme sur Échap.
+    const modal = page.locator("#showcase-test-modal");
+    await expect(modal).toHaveClass(/fr-modal--opened/);
+    await page.keyboard.press("Escape");
+    await expect(modal).not.toHaveClass(/fr-modal--opened/);
 
     // Le moteur pilote bien le contenu arrivé tardivement.
     const accordionButton = page.locator(".fr-accordion__btn").first();
@@ -61,24 +78,22 @@ test("streaming : aucune divergence d'hydratation, moteur fonctionnel", async ({
     await expect(secondTab).toHaveAttribute("aria-selected", "true");
 
     // La table a bien survécu à l'hydratation (contenu, pas seulement
-    // absence de message) — c'est le composant qui porte
-    // suppressHydrationWarning, on vérifie donc que le contenu réel est
-    // correct, pas juste que l'avertissement est tu.
+    // absence de message).
     const table = page.getByTestId("dsfr-showcase").locator("table");
     await expect(table.locator("caption")).toHaveText("Table de test");
     await expect(table.locator("tbody tr")).toHaveCount(2);
     await expect(table.locator("tbody tr").first().locator("td").first()).toHaveText("a1");
 
-    // Le curseur (Range, lui aussi suppressHydrationWarning) est bien
-    // piloté par le moteur DSFR après hydratation : sa sortie est
-    // renseignée à l'initialisation puis suit l'interaction utilisateur.
+    // Le curseur est bien piloté par le moteur DSFR après hydratation : sa
+    // sortie est renseignée à l'initialisation puis suit l'interaction
+    // utilisateur.
     const rangeInput = page.locator("input[type=range]").first();
     const rangeOutput = page.locator(".fr-range__output").first();
     await expect(rangeOutput).not.toHaveText("");
     await rangeInput.fill("80");
     await rangeInput.dispatchEvent("input");
     await expect(rangeOutput).toHaveText("80");
-});
+}
 
 test("StartDsfrOnHydration monté : toujours fonctionnel", async ({ page }) => {
     const hydrationMessages: string[] = [];
