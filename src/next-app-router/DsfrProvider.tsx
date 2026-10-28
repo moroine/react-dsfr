@@ -60,11 +60,12 @@ export function DsfrProviderBase(
         trustedTypesPolicyName = "react-dsfr"
     } = props;
 
-    /*
+    // Les effets des enfants s'exécutent avant ceux du parent : quand celui-ci
+    // se déclenche, le shell est hydraté. C'est ce qui rend
+    // <StartDsfrOnHydration /> optionnel.
     useEffect(() => {
         dsfrEffect();
     }, []);
-    */
 
     useMemo(() => {
         if (!isBrowser) {
@@ -122,6 +123,12 @@ function dsfrEffect(): void {
     });
 }
 
+/**
+ * @deprecated This component is no longer needed: `DsfrProvider` now triggers
+ * the hydration effect itself. It remains exported and fully functional —
+ * `dsfrEffect()` is idempotent — so that applications already mounting it keep
+ * working. You can safely remove it from your pages.
+ */
 export function StartDsfrOnHydration() {
     useEffect(() => {
         dsfrEffect();

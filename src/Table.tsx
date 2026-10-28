@@ -69,6 +69,15 @@ export const Table = memo(
                 id={id}
                 ref={ref}
                 style={style}
+                // Le moteur DSFR pose data-fr-js-table="true" sur ce nœud après
+                // hydratation ; le CSS en dépend, donc l'attribut ne peut pas être
+                // supprimé côté moteur. suppressHydrationWarning ne porte que d'un
+                // seul niveau : il couvre cet attribut-là, mais pas les mutations
+                // que le moteur applique aux descendants — TableElement pose les
+                // classes fr-table__shadow* sur le <table> enfant, TableRow une
+                // variable --row-height sur les <tr>. Ces divergences résiduelles
+                // ne sont donc pas couvertes ici ; elles restent à traiter.
+                suppressHydrationWarning
                 className={cx(
                     fr.cx(
                         "fr-table",

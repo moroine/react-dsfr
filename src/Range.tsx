@@ -149,10 +149,26 @@ export const Range = memo(
                         ),
                         classes.rangeWrapper
                     )}
+                    // Le moteur DSFR pose data-fr-js-range sur ce nœud après
+                    // hydratation ; le CSS en dépend (.fr-range[data-fr-js-range]).
+                    suppressHydrationWarning
                     data-fr-prefix={prefix}
                     data-fr-suffix={suffix}
                 >
-                    <span className={cx(fr.cx("fr-range__output"), classes.output)}></span>
+                    <span
+                        className={cx(fr.cx("fr-range__output"), classes.output)}
+                        // Le moteur DSFR renseigne le texte de ce nœud et lui
+                        // pose un style transform (RangeOutput.change).
+                        // suppressHydrationWarning ne porte que d'un seul
+                        // niveau : celui de .fr-range ci-dessus ne couvre pas
+                        // ce petit-fils, il lui faut le sien. Mesuré : sans
+                        // lui, React lève « Hydration failed » et régénère
+                        // l'arbre ; avec lui, la divergence de style est
+                        // couverte. Reste un avertissement — non couvert par
+                        // ce mécanisme — pour le nœud texte que le moteur
+                        // ajoute et que le rendu serveur n'a pas.
+                        suppressHydrationWarning
+                    ></span>
                     {(() => {
                         const partialInputProps = {
                             type: "range",
