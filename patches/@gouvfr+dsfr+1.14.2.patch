@@ -8,10 +8,32 @@ index e4d335c..6c53dce 100644
  </svg>
 +<!-- Slightly increasing size so it reaches the threshold that will prevent it from being inlined by Vite. -->
 diff --git a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-index fcde523..7996e40 100644
+index 0640386..394ebf8 100644
 --- a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 +++ b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-@@ -6461,9 +6461,11 @@ class HeaderLinks extends api.core.Instance {
+@@ -400,6 +400,8 @@ const queryParentSelector = (element, selectors) => {
+   return queryParentSelector(parent, selectors);
+ };
+ 
++const HYDRATING_SELECTOR = ns.attr.selector('hydrating');
++
+ class Registration {
+   constructor (selector, InstanceClass, creator) {
+     this.selector = selector;
+@@ -441,7 +443,11 @@ class Registration {
+     if (node.matches && node.matches(this.selector)) nodes.push(node);
+     // eslint-disable-next-line no-useless-call
+     if (!nonRecursive && node.querySelectorAll && node.querySelector(this.selector)) nodes.push.apply(nodes, querySelectorAllArray(node, this.selector));
+-    return nodes;
++    // Un sous-arbre marqué data-fr-hydrating est en cours d'hydratation par le
++    // framework qui l'a rendu côté serveur : le moteur n'y touche pas. Le retrait
++    // de l'attribut est une mutation d'attribut, à laquelle Stage répond déjà en
++    // analysant de nouveau tout le sous-arbre.
++    return nodes.filter(n => !n.closest(HYDRATING_SELECTOR));
+   }
+ 
+   create (element) {
+@@ -6461,9 +6467,11 @@ class HeaderLinks extends api.core.Instance {
        case api.Modes.ANGULAR:
        case api.Modes.REACT:
        case api.Modes.VUE:
