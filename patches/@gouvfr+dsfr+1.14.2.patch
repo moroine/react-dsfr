@@ -8,7 +8,7 @@ index e4d335c..6c53dce 100644
  </svg>
 +<!-- Slightly increasing size so it reaches the threshold that will prevent it from being inlined by Vite. -->
 diff --git a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
-index 0640386..2b996cb 100644
+index 0640386..8e30846 100644
 --- a/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 +++ b/node_modules/@gouvfr/dsfr/dist/dsfr.module.js
 @@ -400,6 +400,24 @@ const queryParentSelector = (element, selectors) => {
@@ -71,7 +71,31 @@ index 0640386..2b996cb 100644
  
  api$1.inspector = inspector;
  api$1.colors = colors;
-@@ -6461,9 +6491,11 @@ class HeaderLinks extends api.core.Instance {
+@@ -2365,6 +2395,7 @@ class Disclosure extends Instance {
+ 
+     if (this.group) {
+       this.group.retrieve();
++      this.group.retrieveLate(this);
+       return;
+     }
+ 
+@@ -2627,6 +2658,15 @@ class DisclosuresGroup extends Instance {
+     return this.getIndex();
+   }
+ 
++  // Un membre qui rejoint le groupe après _retrieve() (contenu streamé, ou
++  // libéré par dsfr.hydrated) n'y a pas été vu : ouvert par défaut, il est
++  // ouvert, sauf si un autre membre l'est déjà.
++  retrieveLate (member) {
++    if (!this._hasRetrieved || !member.isInitiallyDisclosed) return;
++    if (!this.isGrouped) member.disclose(true);
++    else if (this.current === null) this.current = member;
++  }
++
+   update () {
+     this.getMembers();
+     if (this._hasRetrieved) {
+@@ -6461,9 +6501,11 @@ class HeaderLinks extends api.core.Instance {
        case api.Modes.ANGULAR:
        case api.Modes.REACT:
        case api.Modes.VUE:
